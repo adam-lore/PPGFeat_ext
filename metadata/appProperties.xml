@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<appProperties xmlns="http://schemas.mathworks.com/matlab/app/2012/appProperties" signature="908DFC0A6935A5012160F5A434DC22E9B223F8FB">
+
+  <entryPoint>segment_13</entryPoint>
+
+  <name>PPGFeat</name>
+
+  <version>1.9</version>
+
+  <createdByMATLABRelease>(R2023a)</createdByMATLABRelease>
+
+  <GUID>ce3c9e7c-ddca-409d-be38-974f8d57af89</GUID>
+
+  <summary>This app takes unfiltered PPG waveform as input and SQI table (Optional) and store single PPG segment.</summary>
+
+  <description>The user can manually perform segmentation of PPG data by selecting the peaks points and store all the data in the single matrix for training purpose. 
+the storage limit is 219x1400 where 219 are raws and 1400 is the individual PPG segment with empty data points zero-padded</description>
+
+  <author>
+    <name>Saad Abdullah</name>
+    <contact>saad.abdullah@mdu.se</contact>
+    <organization>MDU</organization>
+  </author>
+
+  <supportedPlatforms/>
+
+  <requiredProducts/>
+
+  <numFiles>6</numFiles>
+
+  <created>2023-03-17T17:19:47Z</created>
+
+  <appEntries>
+    <appFile>/VPG-ref.png</appFile>
+    <appFile>/cal_c_d.m</appFile>
+    <appFile>/zerocrossing.m</appFile>
+    <appFile>/segment_13.mlapp</appFile>
+    <appFile>/APG-ref.png</appFile>
+    <appFile>/PPG-ref.png</appFile>
+  </appEntries>
+
+</appProperties>

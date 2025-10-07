@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<fileEntries xmlns="http://schemas.mathworks.com/package/2013/filesystemManifest" createdByEncoding="UTF-8" createdByPlatform="maci64" version="2.0">
+  <fileEntry content="/fsroot/APG-ref.png" date="2023-03-08T15:37:16Z" name="/APG-ref.png" permissions="0644" type="File"/>
+  <fileEntry content="/fsroot/PPG-ref.png" date="2023-03-08T15:37:01Z" name="/PPG-ref.png" permissions="0644" type="File"/>
+  <fileEntry content="/fsroot/VPG-ref.png" date="2023-03-08T15:37:10Z" name="/VPG-ref.png" permissions="0644" type="File"/>
+  <fileEntry content="/fsroot/cal_c_d.m" date="2022-11-07T14:11:51Z" name="/cal_c_d.m" permissions="0644" type="File"/>
+  <fileEntry content="/fsroot/segment_13.mlapp" date="2023-03-17T17:18:11Z" name="/segment_13.mlapp" permissions="0666" type="File"/>
+  <fileEntry content="/fsroot/zerocrossing.m" date="2023-03-15T17:46:53Z" name="/zerocrossing.m" permissions="0644" type="File"/>
+</fileEntries>

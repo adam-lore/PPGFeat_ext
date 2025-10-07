@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dcterms:created xsi:type="dcterms:W3CDTF">2023-03-17T17:19:47Z</dcterms:created>
+  <dc:creator>Saad Abdullah</dc:creator>
+  <dc:description>The user can manually perform segmentation of PPG data by selecting the peaks points and store all the data in the single matrix for training purpose. 
+the storage limit is 219x1400 where 219 are raws and 1400 is the individual PPG segment with empty data points zero-padded</dc:description>
+  <dc:title>PPGFeat</dc:title>
+  <cp:version>1.9</cp:version>
+</cp:coreProperties>
