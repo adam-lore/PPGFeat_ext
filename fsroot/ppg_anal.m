@@ -250,37 +250,27 @@ methods
 
     function GenerateOutput(obj)
         %save segmented data of PPG for zero padded values
-
-        PPG_segment = 'PPG_Segments.xlsx';
-        writematrix(obj.PPG_SEG,PPG_segment)
+        writematrix(obj.PPG_SEG, 'PPG_Segments.xlsx')
         PPG = obj.PPG_SEG;
 
         %save segmented data of APG for zero padded values
-
-        APG_segment = 'APG_Segments.xlsx';
-        writematrix(obj.APG_SEG,APG_segment)
+        writematrix(obj.APG_SEG, 'APG_Segments.xlsx')
         APG_s = obj.APG_SEG;
 
         %save location of min and max with segment
-        ID_min_max = 'ID_min1_min2.xlsx';
-        writematrix(obj.SEG_min_max, ID_min_max)
+        writematrix(obj.SEG_min_max, 'ID_min1_min2.xlsx')
         SMM = obj.SEG_min_max;
 
-
         %save filtered data of the whole input PPG 219 x 2100
-        PPG_filter = 'PPG_Filtered_HighSQI.xlsx';
-        writematrix(obj.PPG_filtered,PPG_filter )
+        writematrix(obj.PPG_filtered, 'PPG_Filtered_HighSQI.xlsx')
         PPG_fil = obj.PPG_filtered;
 
         %save feature table
-        
-        PPG_feature = 'PPG_features.xlsx';
-        writematrix(obj.feature,PPG_feature )
+        writematrix(obj.feature, 'PPG_features.xlsx')
         P_feat = obj.feature;
 
         %save c and d presence table
-        c_and_d = 'c_d_presence.xlsx';
-        writematrix(obj.c_d_APG,c_and_d)
+        writematrix(obj.c_d_APG, 'c_d_presence.xlsx')
         C_D = obj.c_d_APG;
 
         save 'Results30Jan' 'PPG' 'APG_s' 'SMM' 'P_feat' PPG_fil 'C_D','-mat';
