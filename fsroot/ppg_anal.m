@@ -65,26 +65,16 @@ methods
 
         if (obj.APG(obj.APG_maxima(2)) > 0)  %means c and d is NOT present in APG
             obj.c_d_not = 1;
-            %disp(1)
-            %obj.N = obj.APG_maxima(2);
-            %obj.D = obj.APG_minima(2);
 
-        %                     hold(obj.UIAxes5,"on")
-        %                     ll = [obj.APG(obj.APG_minima(1)) obj.APG(obj.APG_maxima(2))];
-        %                     plot(obj.UIAxes5,[obj.APG_minima(1) obj.APG_maxima(2)],ll)
-        %                     hold(obj.UIAxes5,"off")
-
-            %obj.c = (obj.APG(obj.APG_maxima(2))-obj.APG(obj.APG_minima(1)))/(obj.APG_maxima(2)-obj.APG_minima(1));
-            %obj.d = (obj.APG_maxima(2)-obj.APG_minima(1))/1000;
             obj.c_d_APG(obj.next) = 0;
             obj.c_and_d_present = obj.c_d_APG(obj.next);
-            %obj.e = obj.APG_maxima(2); 
+
             cal_c_d(obj);
         end
         %updated on 15th march
         if ((obj.APG(obj.APG_maxima(2))  < 0)  && ((obj.APG_maxima(2)-obj.APG_minima(2))<100)) %means c and d is present in APG
             obj.c_d_not = 0; %to provide infor that c & d is present
-            %disp(0)
+
             obj.N = obj.APG_maxima(3);
             obj.D = obj.APG_minima(3);
             obj.c = obj.APG_maxima(2);
@@ -155,8 +145,8 @@ methods
 
             if (max_value_jpg(2) > min_value_jpg(1))
 
-                app.c = max_value_jpg(2);
-                app.d = z_apg(2);
+                obj.c = max_value_jpg(2);
+                obj.d = z_apg(2);
                 A_APG_c = obj.APG(obj.c);
                 A_APG_d = obj.APG(obj.d);
                 obj.e = z_jpg(3);
@@ -202,7 +192,7 @@ methods
                 obj.e = z_jpg(3);
                 f = z_jpg(4);
                 obj.f = f;
-                A_APG_e = obj.APG(app.e);
+                A_APG_e = obj.APG(obj.e);
                 A_APG_f = obj.APG(f);
                 obj.N = obj.e;
                 obj.D = f;
@@ -213,7 +203,6 @@ methods
             end
 
             if (obj.APG_maxima(2) > 0)
-                %disp(app.T2_5)
                 obj.c = min_value_jpg(2)- obj.T2_5;
                 obj.d = min_value_jpg(2)+ obj.T2_5;
                 A_APG_c = obj.APG(obj.c);
