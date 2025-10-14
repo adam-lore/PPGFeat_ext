@@ -183,7 +183,8 @@ methods
             end
 
             if (obj.APG_maxima(2) > 0)
-                obj.c = min_value_jpg(2)- obj.T2_5;
+                obj.c = min_value_jpg(2) - obj.T2_5;
+                obj.d = min_value_jpg(2) + obj.T2_5;
 
                 obj.e = z_jpg(3);
                 f = z_jpg(4);
@@ -246,6 +247,113 @@ methods
         %REMEMBER TO CHANGE
         [file1,path1]= uigetfile('D:\Research\Examensarbete\Datasets\*.csv');
         obj.Ssqi= importdata([path1 file1]);
+    end
+
+    function CalculateFiducial(obj, min1, min2)
+        %select the segment from the filtered ppg
+        obj.seg = obj.PPG_filtered(obj.next, (min1 - 15):(min2 + 15));
+
+        %calculate 2.5% of T
+        obj.T2_5 = floor((((min2 - min1))/100)*2.5);
+
+        obj.VPG = diff(obj.seg)*1000;
+        obj.VPG = smoothdata(obj.VPG, "movmean", 50); %data smoothing using 50 ms window
+
+        obj.APG = diff(obj.VPG)*1000;
+        obj.APG = smoothdata(obj.APG, "movmean", 65); %data smoothing using 65 ms window
+
+        %create matrix for segment information
+        obj.SEG_min_max(obj.next,1) = obj.Sub_ID;
+        obj.SEG_min_max(obj.next,2) = min1 - 15;
+        obj.SEG_min_max(obj.next,3) = min2 + 15;
+
+        %find maxima and minima of current ppg segment
+        PPG_SEG_max = islocalmax(obj.seg,"MinProminence",0.1,"FlatSelection","all",...
+            "MinSeparation",10,"MaxNumExtrema",2);
+        PPG_SEG_min = islocalmin(obj.seg,"MinProminence",0.01,"FlatSelection","all",...
+            "MinSeparation",10,"MaxNumExtrema",3);
+
+        index_max = find(PPG_SEG_max); %index of maxima points
+        value_max = obj.seg(PPG_SEG_max);  %value at maxima point
+
+        index_min = find(PPG_SEG_min) ; %index of maxima points
+        value_min = obj.seg(PPG_SEG_min) ;  %value at maxima point
+        
+        %find maxima and minima of current vpg segment
+        PPG_vpg_max = islocalmax(obj.VPG,"MinProminence",0.2,"FlatSelection","all",...
+            "MinSeparation",50,"MaxNumExtrema",3);
+        PPG_vpg_min = islocalmin(obj.VPG,"MinProminence",0.2,"FlatSelection","all",...
+            "MinSeparation",50,"MaxNumExtrema",2);
+
+        index_max_vpg = find(PPG_vpg_max); %index of maxima points
+        value_max_vpg = obj.VPG(PPG_vpg_max);  %value at maxima point
+
+        index_min_vpg = find(PPG_vpg_min) ; %index of maxima points
+        value_min_vpg = obj.VPG(PPG_vpg_min) ;  %value at maxima point
+
+        %find maxima and minima of current apg segment
+        PPG_apg_max = islocalmax(obj.APG,"MinProminence",1.5,"FlatSelection","all",...
+            "MinSeparation",50,"MaxNumExtrema",5);
+        PPG_apg_min = islocalmin(obj.APG,"MinProminence",1.5,"FlatSelection","all",...
+            "MinSeparation",50,"MaxNumExtrema",5);
+
+        index_max_apg = find(PPG_apg_max); %index of maxima points
+        value_max_apg = obj.APG(PPG_apg_max);  %value at maxima point
+
+        index_min_apg = find(PPG_apg_min) ; %index of maxima points
+        value_min_apg = obj.APG(PPG_apg_min) ;  %value at maxima point
+
+        % new code on 15th MARCH 2023 to check two points close to each other
+        if abs(index_min_apg(1) - index_max_apg(1)) <= 50
+            disp('The first minimum and maximum are close to each other by 50 units.');
+            % Shift the index_min_apg vector by 1
+            index_min_apg = index_min_apg(2:end);
+            value_min_apg = value_min_apg(2:end);
+        end
+
+        %corrected datatips and indexes of APG
+        obj.APG_maxima = index_max_apg;
+        obj.APG_minima = index_min_apg;
+
+        %read all the feature points from PPG VPG and APG
+        obj.O = index_min(1);
+        obj.S = index_max(1);
+
+        %check the presence of c and d
+        obj.APG_c_d_test();
+
+        obj.OSND = [obj.seg(obj.O) obj.seg(obj.S) obj.seg(obj.N) obj.seg(obj.D)];
+
+        obj.W = index_max_vpg(1);
+        obj.X = index_max(1);
+        obj.Y = index_min_vpg(1);
+        obj.Z = index_max_vpg(2);
+
+        obj.WXYZ = [obj.VPG(obj.W) obj.VPG(obj.X) obj.VPG(obj.Y) obj.VPG(obj.Z)];
+
+        obj.a = index_max_apg(1);
+        obj.b = index_min_apg(1);
+
+        obj.abcde = [obj.APG(obj.a) obj.APG(obj.b) obj.APG(obj.c) obj.APG(obj.d) obj.APG(obj.e)];
+
+        %time variables of all waveform
+        obj.OSND_time  = [obj.O obj.S obj.N obj.D];
+        obj.WXYZ_time  = [obj.W obj.X obj.Y obj.Z];
+        obj.abcde_time = [obj.a obj.b obj.c obj.d obj.e];
+
+        %for f values of APG
+        F_Value = obj.APG(obj.f);
+        F_t = obj.f;
+        %for On+1 values of PPG
+        O_next_t = ((min2 - min1) + 16);
+        O_next = obj.seg(O_next_t);
+
+        %feature table
+        obj.feature(obj.next,:) = [obj.OSND O_next obj.WXYZ obj.abcde F_Value obj.OSND_time O_next_t obj.WXYZ_time obj.abcde_time F_t];
+
+        %store segments by zero padding remaining values
+        obj.PPG_SEG(obj.next,:) = [obj.seg zeros(1,(obj.Size_loaded_data(2)-700)-length(obj.seg))];
+        obj.APG_SEG(obj.next,:) = [obj.APG zeros(1,(obj.Size_loaded_data(2)-700)-length(obj.APG))];
     end
 
     function GenerateOutput(obj)
