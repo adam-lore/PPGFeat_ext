@@ -128,18 +128,13 @@ methods
 
                 obj.c = max_value_jpg(1);
                 obj.d = z_apg(2);
-                A_APG_c = obj.APG(obj.c);
-                A_APG_d = obj.APG(obj.d);
+
                 obj.e = z_jpg(3);
                 f = z_jpg(4);
                 obj.f = f;
-                A_APG_e = obj.APG(obj.e);
-                A_APG_f = obj.APG(f);
+
                 obj.N = obj.e;
                 obj.D = f;
-                A_PPG_N = obj.seg(obj.N);
-                A_PPG_D = obj.seg(obj.D);
-                %disp("One")
                 break
             end
 
@@ -147,18 +142,13 @@ methods
 
                 obj.c = max_value_jpg(2);
                 obj.d = z_apg(2);
-                A_APG_c = obj.APG(obj.c);
-                A_APG_d = obj.APG(obj.d);
+
                 obj.e = z_jpg(3);
                 f = z_jpg(4);
                 obj.f = f;
-                A_APG_e = obj.APG(obj.e);
-                A_APG_f = obj.APG(f);
+
                 obj.N = obj.e;
                 obj.D = f;
-                A_PPG_N = obj.seg(obj.N);
-                A_PPG_D = obj.seg(obj.D);
-                %disp("Two")
                 break
             end
 
@@ -166,18 +156,13 @@ methods
 
                 obj.c = max_value_jpg(3);
                 obj.d = z_apg(2);
-                A_APG_c = obj.APG(obj.c);
-                A_APG_d = obj.APG(obj.d);
+
                 obj.e = z_jpg(3);
                 f = z_jpg(4);
                 obj.f = f;
-                A_APG_e = obj.APG(obj.e);
-                A_APG_f = obj.APG(f);
+
                 obj.N = obj.e;
                 obj.D = f;
-                A_PPG_N = obj.seg(obj.N);
-                A_PPG_D = obj.seg(obj.D);
-                %disp("three")
                 break
             end
         end
@@ -187,36 +172,25 @@ methods
             if (obj.APG_maxima(2) < 0)
                 obj.c = obj.APG_maxima(2);
                 obj.d = obj.APG_minima(2);
-                A_APG_c = obj.APG(obj.c);
-                A_APG_d = obj.APG(obj.d);
+
                 obj.e = z_jpg(3);
                 f = z_jpg(4);
                 obj.f = f;
-                A_APG_e = obj.APG(obj.e);
-                A_APG_f = obj.APG(f);
+
                 obj.N = obj.e;
                 obj.D = f;
-                A_PPG_N = obj.seg(obj.N);
-                A_PPG_D = obj.seg(obj.D);
-                %disp("c d founded in APG")
                 break
             end
 
             if (obj.APG_maxima(2) > 0)
                 obj.c = min_value_jpg(2)- obj.T2_5;
-                obj.d = min_value_jpg(2)+ obj.T2_5;
-                A_APG_c = obj.APG(obj.c);
-                A_APG_d = obj.APG(obj.d);
+
                 obj.e = z_jpg(3);
                 f = z_jpg(4);
                 obj.f = f;
-                A_APG_e = obj.APG(obj.e);
-                A_APG_f = obj.APG(f);
+
                 obj.N = obj.e;
                 obj.D = f;
-                A_PPG_N = obj.seg(obj.N);
-                A_PPG_D = obj.seg(obj.D);
-                %disp("c d founded in JPG + -20")
                 break
             end
 
