@@ -215,6 +215,9 @@ methods
         [file,path]= uigetfile('D:\Research\Examensarbete\Datasets\*.csv');  %read CVS file
         obj.loadedData = importdata([path file]); %load all RAW data
 
+        %mimic = importdata([path file]);
+        %obj.loadedData = rot90(mimic.data(:, 2));
+
         obj.Size_loaded_data = size(obj.loadedData); %read size of loaded data
         obj.SEG_min_max = zeros(obj.Size_loaded_data(1), 3); %variable to store location of min and max with data id
         filtered = zeros(obj.Size_loaded_data); %Create matrix to store filtered PPG 
@@ -279,9 +282,9 @@ methods
         segment = obj.PPG_filtered(obj.next ,:);
         %find maxima and minima of current segment
         PPG_max = islocalmax(segment ,"MinProminence",0.1,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/5) ,"MaxNumExtrema",10);
+            "MinSeparation", ceil(obj.RFs/5));
         PPG_min = islocalmin(segment ,"MinProminence",0.1,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/10) ,"MaxNumExtrema",10);
+            "MinSeparation", ceil(obj.RFs/10));
     end
 
     function CalculateFiducial(obj, min1, min2)
