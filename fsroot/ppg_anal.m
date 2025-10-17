@@ -112,7 +112,7 @@ methods
         z_apg = zerocrossing(obj,obj.APG);
         Jpg = diff(obj.APG)*1000;
         Jpg = smoothdata(Jpg,"movmean", ceil(obj.RFs/12)); %data smoothing using 85 ms window at 1000Hz
-        plot(Jpg);
+
         max_index_jpg = islocalmax(Jpg,"MinProminence",40,"FlatSelection","all",...
             "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",5);
         min_index_jpg = islocalmin(Jpg,"MinProminence",50,"FlatSelection","all",...
