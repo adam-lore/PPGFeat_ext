@@ -26,36 +26,36 @@ classdef ppg_anal < handle
         T2_5 %2.5 % of total length of selected segment
 
         % For PPG Segments
-        O % Description
-        S % Description
-        N % Description
-        D % Description
+        on % onset
+        sp % systolic peak
+        dn % dicrotic notch
+        dp % diastolic peak
 
         % For VPG Segments
-        W % Description
-        X % Description
-        Y % Description
-        Z % Description
+        u % global maxima in systolic phase
+        x % local maxima in systolic phase
+        v % global minima in systolic phase
+        w % first local maxima in diastolic phase
 
         % For APG Segments
-        a % Description
-        b % Description
-        c % Description
-        d % Description
-        e % Description
-        f % Description
+        a % early systolic positive peak
+        b % early systolic negative peak
+        c % late systolic re-increasing wave
+        d % eate systolic re-decreasing wave
+        e % early diastolic positive wave
+        f % diastolic negative wave
 
         c_and_d_present % 1 if c and d points are present
 
         %Vectors for segment
 
-        OSND %for PPG
-        WXYZ %for VPG
+        OnSpDnDp %for PPG
+        uxvw %for VPG
         abcde %for APG
         feature %store feature table
 
-        OSND_time % dt values of PPG
-        WXYZ_time % dt values of VPG
+        OnSpDnDp_time % dt values of PPG
+        uxvw_time % dt values of VPG
         abcde_time % dt values of APG
         zero_c    % store zero crossing values
     end
@@ -76,8 +76,8 @@ methods
         if ((obj.APG(obj.APG_maxima(2))  < 0)  && ((obj.APG_maxima(2)-obj.APG_minima(2))<100)) %means c and d is present in APG
             obj.c_d_not = 0; %to provide infor that c & d is present
 
-            obj.N = obj.APG_maxima(3);
-            obj.D = obj.APG_minima(3);
+            obj.dn = obj.APG_maxima(3);
+            obj.dp = obj.APG_minima(3);
             obj.c = obj.APG_maxima(2);
             obj.d = obj.APG_minima(2);
             obj.e = obj.APG_maxima(3);
@@ -134,8 +134,8 @@ methods
                 f = z_jpg(4);
                 obj.f = f;
 
-                obj.N = obj.e;
-                obj.D = f;
+                obj.dn = obj.e;
+                obj.dp = f;
                 break
             end
 
@@ -148,8 +148,8 @@ methods
                 f = z_jpg(4);
                 obj.f = f;
 
-                obj.N = obj.e;
-                obj.D = f;
+                obj.dn = obj.e;
+                obj.dp = f;
                 break
             end
 
@@ -162,8 +162,8 @@ methods
                 f = z_jpg(4);
                 obj.f = f;
 
-                obj.N = obj.e;
-                obj.D = f;
+                obj.dn = obj.e;
+                obj.dp = f;
                 break
             end
         end
@@ -178,8 +178,8 @@ methods
                 f = z_jpg(4);
                 obj.f = f;
 
-                obj.N = obj.e;
-                obj.D = f;
+                obj.dn = obj.e;
+                obj.dp = f;
                 break
             end
 
@@ -191,8 +191,8 @@ methods
                 f = z_jpg(4);
                 obj.f = f;
 
-                obj.N = obj.e;
-                obj.D = f;
+                obj.dn = obj.e;
+                obj.dp = f;
                 break
             end
 
@@ -251,8 +251,8 @@ methods
         end
 
         %initialize the variables
-        obj.OSND = zeros(1,4);
-        obj.WXYZ = zeros(1,4);
+        obj.OnSpDnDp = zeros(1,4);
+        obj.uxvw = zeros(1,4);
         obj.abcde = zeros(1,5);
         obj.feature = zeros(obj.Size_loaded_data(1), 30);
         obj.c_d_APG = zeros(obj.Size_loaded_data(1), 1);
@@ -304,8 +304,8 @@ methods
         obj.VPG = smoothdata(obj.VPG, "movmean", ceil(obj.RFs/20)); %data smoothing using 50 ms window at 1000Hz
 
         obj.APG = diff(obj.VPG)*1000;
-        obj.APG = smoothdata(obj.APG, "movmean", ceil(obj.RFs/15)); %data smoothing using 65 ms window at 1000Hz
-        %obj.APG = smoothdata(obj.APG, "movmean", 65); %data smoothing using 65 ms window at 1000Hz
+        %obj.APG = smoothdata(obj.APG, "movmean", ceil(obj.RFs/15)); %data smoothing using 65 ms window at 1000Hz
+        obj.APG = smoothdata(obj.APG, "movmean", 65); %data smoothing using 65 ms window at 1000Hz
 
         %create matrix for segment information
         obj.SEG_min_max(obj.next,1) = obj.Sub_ID;
@@ -361,20 +361,20 @@ methods
         obj.APG_minima = index_min_apg;
 
         %read all the feature points from PPG VPG and APG
-        obj.O = index_min(1);
-        obj.S = index_max(1);
+        obj.on = index_min(1);
+        obj.sp = index_max(1);
 
         %check the presence of c and d
         obj.APG_c_d_test();
 
-        obj.OSND = [obj.seg(obj.O) obj.seg(obj.S) obj.seg(obj.N) obj.seg(obj.D)];
+        obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) obj.seg(obj.dn) obj.seg(obj.dp)];
 
-        obj.W = index_max_vpg(1);
-        obj.X = index_max(1);
-        obj.Y = index_min_vpg(1);
-        obj.Z = index_max_vpg(2);
+        obj.u = index_max_vpg(1);
+        obj.x = index_max(1);
+        obj.v = index_min_vpg(1);
+        obj.w = index_max_vpg(2);
 
-        obj.WXYZ = [obj.VPG(obj.W) obj.VPG(obj.X) obj.VPG(obj.Y) obj.VPG(obj.Z)];
+        obj.uxvw = [obj.VPG(obj.u) obj.VPG(obj.x) obj.VPG(obj.v) obj.VPG(obj.w)];
 
         obj.a = index_max_apg(1);
         obj.b = index_min_apg(1);
@@ -382,8 +382,8 @@ methods
         obj.abcde = [obj.APG(obj.a) obj.APG(obj.b) obj.APG(obj.c) obj.APG(obj.d) obj.APG(obj.e)];
 
         %time variables of all waveform
-        obj.OSND_time  = [obj.O obj.S obj.N obj.D];
-        obj.WXYZ_time  = [obj.W obj.X obj.Y obj.Z];
+        obj.OnSpDnDp_time  = [obj.on obj.sp obj.dn obj.dp];
+        obj.uxvw_time  = [obj.u obj.x obj.v obj.w];
         obj.abcde_time = [obj.a obj.b obj.c obj.d obj.e];
 
         %for f values of APG
@@ -394,7 +394,7 @@ methods
         O_next = obj.seg(O_next_t);
 
         %feature table
-        obj.feature(obj.next,:) = [obj.OSND O_next obj.WXYZ obj.abcde F_Value obj.OSND_time O_next_t obj.WXYZ_time obj.abcde_time F_t];
+        obj.feature(obj.next,:) = [obj.OnSpDnDp O_next obj.uxvw obj.abcde F_Value obj.OnSpDnDp_time O_next_t obj.uxvw_time obj.abcde_time F_t];
 
         seg_size = size(obj.PPG_SEG);
         %store segments by zero padding remaining values
