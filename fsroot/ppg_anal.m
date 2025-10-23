@@ -64,7 +64,7 @@ classdef ppg_anal < handle
     end
   
 methods
-    function LoadPPG(obj, OFs, RFs, FL, FH)
+    function res = LoadPPG(obj, OFs, RFs, FL, FH)
         %data is loaded from file
         obj.is_dir = false;
 
@@ -80,6 +80,10 @@ methods
 
         %REMEMBER TO CHANGE
         [file,path]= uigetfile('D:\Research\Examensarbete\Datasets\*.csv');  %read CVS file
+        if (path == 0)
+            res = false;
+            return
+        end
         obj.loaded_data = importdata([path file]); %load all RAW data
 
         %mimic = importdata([path file]);
@@ -131,9 +135,11 @@ methods
         obj.Ssqi = [A B];
 
         obj.Sub_ID = obj.Ssqi(obj.next,2);
+
+        res = true;
     end
 
-    function LoadDirectory(obj, OFs, RFs, FL, FH)
+    function res = LoadDirectory(obj, OFs, RFs, FL, FH)
         %data is loaded from directory
         obj.is_dir = true;
 
@@ -149,6 +155,10 @@ methods
 
         %REMEMBER TO CHANGE
         path = uigetdir('D:\Research\Examensarbete\Datasets');  %read CVS file
+        if (path == 0)
+            res = false;
+            return
+        end
         obj.dir_files = dir([path, '\*.csv']);
 
         obj.size_data = [size(obj.dir_files), 1]; %read number of entries
@@ -175,6 +185,8 @@ methods
         obj.Sub_ID = obj.Ssqi(obj.next,2);
 
         obj.LoadFile();
+
+        res = true;
     end
 
     function LoadSsqi(obj)
