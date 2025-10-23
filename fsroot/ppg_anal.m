@@ -272,9 +272,15 @@ methods
         obj.Ssqi= importdata([path1 file1]);
     end
 
-    function Next(obj)
-        obj.next = obj.next + 1;
-        obj.Sub_ID = obj.Ssqi(obj.next,2);
+    function res = Next(obj)
+        if (obj.next < obj.Size_loaded_data(1))
+            obj.next = obj.next + 1;
+            obj.Sub_ID = obj.Ssqi(obj.next,2);
+
+            res = true;
+        else
+            res = false;
+        end
     end
 
     function [PPG_max, PPG_min] = FindSegMaxMin(obj)
