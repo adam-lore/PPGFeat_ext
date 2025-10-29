@@ -61,6 +61,8 @@ classdef ppg_anal < handle
         uxvw_time % dt values of VPG
         abcde_time % dt values of APG
         zero_c    % store zero crossing values
+
+        entry_and_seg_id % id of the entry and the segment of the entry
     end
   
 methods
@@ -127,6 +129,7 @@ methods
         obj.abcde = zeros(1,5);
         obj.feature = zeros(obj.size_data(1), 30);
         obj.c_d_APG = zeros(obj.size_data(1), 1);
+        obj.entry_and_seg_id = zeros(obj.size_data(1), 2);
 
         % Create empty Ssqi values
         A = ones(obj.size_data(1),1);
@@ -175,6 +178,7 @@ methods
         obj.abcde = zeros(1,5);
         obj.feature = zeros(obj.size_data(1), 30);
         obj.c_d_APG = zeros(obj.size_data(1), 1);
+        obj.entry_and_seg_id = zeros(obj.size_data(1), 2);
 
         % Create empty Ssqi values
         A = ones(1,1);
@@ -216,7 +220,7 @@ methods
 
     function [PPG_max, PPG_min] = FindSegMaxMin(obj)
 
-        segment = obj.PPG_filtered(obj.data_idx ,:);
+        segment = obj.PPG_filtered(obj.next ,:);
         %find maxima and minima of current segment
         PPG_max = islocalmax(segment ,"MinProminence",0.1,"FlatSelection","all",...
             "MinSeparation", ceil(obj.RFs/5));
@@ -226,7 +230,7 @@ methods
 
     function CalculateFiducial(obj, min1, min2)
         %select the segment from the filtered ppg
-        obj.seg = obj.PPG_filtered(obj.data_idx, (min1 - ceil(obj.RFs/67)):(min2 + ceil(obj.RFs/67)));
+        obj.seg = obj.PPG_filtered(obj.next, (min1 - ceil(obj.RFs/67)):(min2 + ceil(obj.RFs/67)));
         %plot(obj.seg);
         %calculate 2.5% of T
         obj.T2_5 = floor((((min2 - min1))/100)*2.5);
@@ -391,11 +395,11 @@ methods (Access = private)
         %normalizing the data
         m = mean(filtered_data);
         st = std(filtered_data);
-        filtered(1, :) = (filtered_data - m)/st; %store filtered data
+        filtered(obj.next, :) = (filtered_data - m)/st; %store filtered data
 
         if (obj.RFs ~= obj.OFs)
             %resample the data from OFs to RFs    
-            obj.PPG_filtered(1, :) = resample(filtered(1, :), obj.RFs, obj.OFs);
+            obj.PPG_filtered(obj.next, :) = resample(filtered(obj.next, :), obj.RFs, obj.OFs);
         else
             obj.PPG_filtered = filtered;
         end
