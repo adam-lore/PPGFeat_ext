@@ -155,7 +155,8 @@ methods
                         if (end_seg > ceil(obj.size_data(2) * (RFs / OFs)))
                             end_seg = ceil(obj.size_data(2) * (RFs / OFs));
                         end
-                         obj.PPG_filtered(1 + ((i - 1) * obj.num_seg) + j, :) = resize(resampled(start_seg:end_seg), num_per_seg);
+                        obj.PPG_filtered(1 + ((i - 1) * obj.num_seg) + j, :) = resize(resampled(start_seg:end_seg), num_per_seg);
+                        obj.entry_and_seg_id(1 + ((i - 1) * obj.num_seg) + j, :) = [i j + 1];
                     end
                 end
             end
@@ -174,6 +175,7 @@ methods
                             end_seg = obj.size_data(2);
                         end
                         obj.PPG_filtered(1 + ((i - 1) * obj.num_seg) + j, :) = resize(filtered(i, start_seg:end_seg), num_per_seg);
+                        obj.entry_and_seg_id(1 + ((i - 1) * obj.num_seg) + j, :) = [i j + 1];
                     end
                 end
             end
@@ -415,15 +417,21 @@ methods
     end
 
     function GenerateOutput(obj)
+
         %save segmented data of PPG for zero padded values
+        arr_size = size(obj.PPG_SEG);
+        obj.PPG_SEG = resize(obj.PPG_SEG, [obj.total_seg_idx arr_size(2)]);
         writematrix(obj.PPG_SEG, 'PPG_Segments.xlsx')
         PPG = obj.PPG_SEG;
 
         %save segmented data of APG for zero padded values
+        arr_size = size(obj.APG_SEG);
+        obj.APG_SEG = resize(obj.APG_SEG, [obj.total_seg_idx arr_size(2)]);
         writematrix(obj.APG_SEG, 'APG_Segments.xlsx')
         APG_s = obj.APG_SEG;
 
         %save location of min and max with segment
+        obj.SEG_min_max = resize(obj.SEG_min_max, [obj.total_seg_idx 3]);
         writematrix(obj.SEG_min_max, 'ID_min1_min2.xlsx')
         SMM = obj.SEG_min_max;
 
@@ -432,14 +440,21 @@ methods
         PPG_fil = obj.PPG_filtered;
 
         %save feature table
+        obj.feature = resize(obj.feature, [obj.total_seg_idx 30]);
         writematrix(obj.feature, 'PPG_features.xlsx')
         P_feat = obj.feature;
 
         %save c and d presence table
+        obj.c_d_APG = resize(obj.c_d_APG, [obj.total_seg_idx 1]);
         writematrix(obj.c_d_APG, 'c_d_presence.xlsx')
         C_D = obj.c_d_APG;
 
-        save 'Results30Jan' 'PPG' 'APG_s' 'SMM' 'P_feat' PPG_fil 'C_D','-mat';
+        %save entry and segment index table
+        obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.total_seg_idx 2]);
+        writematrix(obj.entry_and_seg_id, 'entry_and_seg_id.xlsx')
+        index = obj.entry_and_seg_id;
+
+        save 'Results30Jan' 'PPG' 'APG_s' 'SMM' 'P_feat' PPG_fil 'C_D' 'index','-mat';
     end
 
 end
@@ -468,6 +483,7 @@ methods (Access = private)
             %if the assumed total number of segemnts after division is larger than previously assumed, resize array to fit assumtion
         elseif (obj.is_seg == true && obj.total_seg_idx + (obj.num_files - obj.entry_idx + 1) * obj.num_seg > obj.size_data(1))
             obj.size_data(1) = obj.total_seg_idx + (obj.num_files - obj.entry_idx + 1) * obj.num_seg;
+            obj.SEG_min_max = resize(obj.SEG_min_max, [obj.size_data(1) 3]);
             obj.PPG_filtered = resize(obj.PPG_filtered, [obj.size_data(1) obj.size_data(2)]);
             obj.PPG_SEG = resize(obj.PPG_SEG, [obj.size_data(1) obj.size_data(2)]);
             obj.APG_SEG = resize(obj.APG_SEG, [obj.size_data(1) obj.size_data(2)]);
@@ -503,6 +519,7 @@ methods (Access = private)
                         end_seg =  ceil(size_file(2) * (obj.RFs / obj.OFs));
                     end
                     obj.PPG_filtered(obj.total_seg_idx + j, :) = resize(resampled(start_seg:end_seg), obj.size_data(2));
+                    obj.entry_and_seg_id(obj.total_seg_idx + j, :) = [obj.entry_idx j + 1];
                 end
             end
         else
@@ -517,6 +534,7 @@ methods (Access = private)
                         end_seg = size_file(2);
                     end
                     obj.PPG_filtered(obj.total_seg_idx + j, :) = resize(filtered(obj.entry_idx, start_seg:end_seg), obj.size_data(2));
+                    obj.entry_and_seg_id(obj.total_seg_idx + j, :) = [obj.entry_idx j + 1];
                 end
             end
         end
