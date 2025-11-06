@@ -2,9 +2,6 @@ classdef ppg_anal < handle
 
     properties (Access = public)
         loaded_data % Description  
-        is_dir % wheter data is loaded from a directory or a file
-        dir_files % to store files in directory
-        num_files % number of files in directory
         seg %to store ppg segment
         PPG_SEG % for PPG segment
         data_idx % data index
@@ -18,8 +15,6 @@ classdef ppg_anal < handle
         SEG_min_max % Description
         VPG % VPG segment
         APG % APG segment
-        filter_sos % filter 
-        g % storing filter
         APG_SEG %to store APG segment
         c_d_not % to detect the presence of c and d in APG
         APG_maxima %store all maxima of APG
@@ -54,8 +49,6 @@ classdef ppg_anal < handle
         e % early diastolic positive wave
         f % diastolic negative wave
 
-        c_and_d_present % 1 if c and d points are present
-
         %Vectors for segment
 
         OnSpDnDp %for PPG
@@ -66,17 +59,25 @@ classdef ppg_anal < handle
         OnSpDnDp_time % dt values of PPG
         uxvw_time % dt values of VPG
         abcde_time % dt values of APG
-        zero_c    % store zero crossing values
 
         entry_and_seg_id % id of the entry and the segment of the entry
     end
 
     properties (Access = private)
+        is_dir % wheter data is loaded from a directory or a file
+        dir_files % to store files in directory
+        num_files % number of files in directory
         dir_ext % extension of files in directory to load
         data_col % what column the data is in
+        filter_sos % filter 
+        g % storing filter
     end
   
 methods
+    function obj = ppg_anal()
+        addpath('fsroot/functions');
+    end
+
     function res = LoadPPG(obj, OFs, RFs, FL, FH, is_seg, seg_len)
         %data is loaded from file
         obj.is_dir = false;
@@ -422,8 +423,8 @@ methods
         value_min_apg = obj.APG(PPG_apg_min) ;  %value at maxima point
 
         % new code on 15th MARCH 2023 to check two points close to each other
-        if abs(index_min_apg(1) - index_max_apg(1)) <= 50
-            disp('The first minimum and maximum are close to each other by 50 units.');
+        if abs(index_min_apg(1) - index_max_apg(1)) <= ceil(obj.RFs/20)
+            disp('The first minimum and maximum are close to each other');
             % Shift the index_min_apg vector by 1
             index_min_apg = index_min_apg(2:end);
             value_min_apg = value_min_apg(2:end);
@@ -438,7 +439,23 @@ methods
         obj.sp = index_max(1);
 
         %check the presence of c and d
-        obj.APG_c_d_test();
+        %obj.APG_c_d_test();
+
+        z_apg = zerocrossing(obj.APG);
+        Jpg = diff(obj.APG)*1000;
+        Jpg = smoothdata(Jpg,"movmean", ceil(obj.RFs/12)); %data smoothing using 85 ms window at 1000Hz
+
+        max_index_jpg = islocalmax(Jpg,"MinProminence",40,"FlatSelection","all",...
+            "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",5);
+        min_index_jpg = islocalmin(Jpg,"MinProminence",50,"FlatSelection","all",...
+            "MinSeparation",ceil(obj.RFs/20) ,"MaxNumExtrema",5);
+
+        max_value_jpg = find(max_index_jpg); %first point of jpg is not detected
+        min_value_jpg  = find(min_index_jpg);
+        z_jpg = zerocrossing(Jpg);
+
+        [obj.c_d_not, obj.c, obj.d, obj.e, obj.f, obj.dn, obj.dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
+                                                    Jpg, max_value_jpg, min_value_jpg, z_apg, z_jpg, obj.T2_5);
 
         obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) obj.seg(obj.dn) obj.seg(obj.dp)];
 
@@ -628,38 +645,8 @@ methods (Access = private)
         obj.Ssqi = [A B];
     end
 
-    function APG_c_d_test(obj)
-        obj.c_d_not = 0;
-
-        if (obj.APG(obj.APG_maxima(2)) > 0)  %means c and d is NOT present in APG
-            obj.c_d_not = 1;
-
-            obj.c_d_APG(obj.total_seg_idx) = 0;
-            obj.c_and_d_present = obj.c_d_APG(obj.total_seg_idx);
-
-            cal_c_d(obj);
-        end
-        %updated on 15th march
-        if ((obj.APG(obj.APG_maxima(2))  < 0)  && ((obj.APG_maxima(2)-obj.APG_minima(2))<100)) %means c and d is present in APG
-            obj.c_d_not = 0; %to provide infor that c & d is present
-
-            obj.dn = obj.APG_maxima(3);
-            obj.dp = obj.APG_minima(3);
-            obj.c = obj.APG_maxima(2);
-            obj.d = obj.APG_minima(2);
-            obj.e = obj.APG_maxima(3);
-            obj.f = obj.APG_minima(3);
-            obj.c_d_APG(obj.total_seg_idx) = 1;
-            obj.c_and_d_present = obj.c_d_APG(obj.total_seg_idx);
-        else %changed 15th march
-            obj.c_d_APG(obj.total_seg_idx) = 1;
-            obj.c_and_d_present = obj.c_d_APG(obj.total_seg_idx);
-            cal_c_d(obj);
-        end
-    end
-
     %%created zero crossing function on 9th jan
-    function loc = zerocrossing(obj,x)
+    function loc = zerocrossingd(obj,x)
         inew = 1;
         r = x;
         loc =0;
@@ -670,102 +657,6 @@ methods (Access = private)
                 inew = inew + 1;
             end
         end
-        obj.zero_c = loc;
-    end
-
-    %%created function on 9th jan to implement methods for finding c
-        %%and d uding new method
-    function cal_c_d(obj)
-        z_apg = zerocrossing(obj,obj.APG);
-        Jpg = diff(obj.APG)*1000;
-        Jpg = smoothdata(Jpg,"movmean", ceil(obj.RFs/12)); %data smoothing using 85 ms window at 1000Hz
-
-        max_index_jpg = islocalmax(Jpg,"MinProminence",40,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",5);
-        min_index_jpg = islocalmin(Jpg,"MinProminence",50,"FlatSelection","all",...
-            "MinSeparation",ceil(obj.RFs/20) ,"MaxNumExtrema",5);
-
-        max_value_jpg = find(max_index_jpg); %first point of jpg is not detected
-        min_value_jpg  = find(min_index_jpg);
-        z_jpg = zerocrossing(obj,Jpg);
-
-        %%To find values for c nd d using new method
-
-        while (Jpg(min_value_jpg(2)) < 0)
-            if (max_value_jpg(1) > min_value_jpg(1))
-
-                obj.c = max_value_jpg(1);
-                obj.d = z_apg(2);
-
-                obj.e = z_jpg(3);
-                f = z_jpg(4);
-                obj.f = f;
-
-                obj.dn = obj.e;
-                obj.dp = f;
-                break
-            end
-
-            if (max_value_jpg(2) > min_value_jpg(1))
-
-                obj.c = max_value_jpg(2);
-                obj.d = z_apg(2);
-
-                obj.e = z_jpg(3);
-                f = z_jpg(4);
-                obj.f = f;
-
-                obj.dn = obj.e;
-                obj.dp = f;
-                break
-            end
-
-            if (max_value_jpg(3) > min_value_jpg(1))
-
-                obj.c = max_value_jpg(3);
-                obj.d = z_apg(2);
-
-                obj.e = z_jpg(3);
-                f = z_jpg(4);
-                obj.f = f;
-
-                obj.dn = obj.e;
-                obj.dp = f;
-                break
-            end
-        end
-
-
-        while (Jpg(min_value_jpg(2)) >0)
-            if (obj.APG_maxima(2) < 0)
-                obj.c = obj.APG_maxima(2);
-                obj.d = obj.APG_minima(2);
-
-                obj.e = z_jpg(3);
-                f = z_jpg(4);
-                obj.f = f;
-
-                obj.dn = obj.e;
-                obj.dp = f;
-                break
-            end
-
-            if (obj.APG_maxima(2) > 0)
-                obj.c = min_value_jpg(2) - obj.T2_5;
-                obj.d = min_value_jpg(2) + obj.T2_5;
-
-                obj.e = z_jpg(3);
-                f = z_jpg(4);
-                obj.f = f;
-
-                obj.dn = obj.e;
-                obj.dp = f;
-                break
-            end
-
-        end
-
-
     end
 end
 
