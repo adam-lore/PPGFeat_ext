@@ -70,6 +70,11 @@ classdef ppg_anal < handle
 
         entry_and_seg_id % id of the entry and the segment of the entry
     end
+
+    properties (Access = private)
+        dir_ext % extension of files in directory to load
+        data_col % what column the data is in
+    end
   
 methods
     function res = LoadPPG(obj, OFs, RFs, FL, FH, is_seg, seg_len)
@@ -91,17 +96,36 @@ methods
         obj.seg_len = seg_len;
 
         %REMEMBER TO CHANGE
-        [file,path]= uigetfile('D:\Research\Examensarbete\Datasets\*.csv');  %read CVS file
+        [file, path]= uigetfile({'*.txt';'*.csv;*.xlsx';'*.mat'}, 'Load PPG File', 'D:\Research\Examensarbete\Datasets\');  %read CVS file
         if (path == 0)
             res = false;
             return
         end
-        obj.loaded_data = importdata([path file]); %load all RAW data
 
-        %mimic = importdata([path file]);
-        %obj.loaded_data = rot90(mimic.data(:, 2));
+        [~, ~, file_extension] = fileparts(file);
+        %load all RAW data depending on file format
+        switch file_extension
+            case {'.txt' , '.csv', '.xlsx'}
+                obj.loaded_data = importdata([path file]); 
+            case '.mat'
+                mat_var_arr = who('-file', [path file]);
 
-        
+                if (size(mat_var_arr) == 1)
+                    mat_var = mat_var_arr{1};
+                else
+                    [var_idx, tf] = listdlg('SelectionMode', 'single', 'ListString', mat_var_arr);
+                    if (tf == false)
+                        res = false;
+                        return
+                    end
+                    mat_var = mat_var_arr{var_idx};
+                end
+                loaded_struct = load([path file], mat_var);
+                obj.loaded_data = loaded_struct.(mat_var);
+            otherwise
+                res = false;
+                return
+        end
 
         obj.size_data = size(obj.loaded_data); %read size of loaded data
 
@@ -224,10 +248,45 @@ methods
             res = false;
             return
         end
-        obj.dir_files = dir([path, '\*.csv']);
+        allowed_extensions = {'.mat', '.csv', '.xlsx', '.txt'};
+        [idx, tf] = listdlg('PromptString', {'Select file format'}, ...
+                                'SelectionMode', 'single', 'ListString', allowed_extensions);
+        if (tf == false)
+            res = false;
+            return
+        end
+
+        obj.dir_ext = allowed_extensions{idx};
+        obj.dir_files = dir([path, '\*' obj.dir_ext]);
 
         obj.size_data = [size(obj.dir_files), 1]; %read number of entries
         obj.num_files = obj.size_data(1);
+
+        if (obj.num_files == 0)
+            res = false;
+            return
+        end
+
+        first_file = importdata([obj.dir_files(1).folder '\' obj.dir_files(1).name]);
+
+        if (isa(first_file, 'struct'))
+            if (strcmp(obj.dir_ext, '.mat'))
+                col_arr = fieldnames(first_file);
+            else
+                col_arr = first_file.colheaders;
+            end
+            if (size(col_arr) == 1)
+                obj.data_col = 1;
+            else
+                [obj.data_col, tf] = listdlg('SelectionMode','single', 'ListString', col_arr);
+            end
+        end
+        
+
+        if (tf == false)
+            res = false;
+            return
+        end
 
         obj.SEG_min_max = zeros(obj.size_data(1), 3); %variable to store location of min and max with data id
 
@@ -461,9 +520,33 @@ end
 
 methods (Access = private)
     function LoadFile(obj)
-        %load entry_idx file in folder
-        mimic = importdata([obj.dir_files(obj.entry_idx).folder '\' obj.dir_files(obj.entry_idx).name]);
-        obj.loaded_data = rot90(mimic.data(:, 2));
+        filepath = [obj.dir_files(obj.entry_idx).folder '\' obj.dir_files(obj.entry_idx).name];
+
+        
+        obj.loaded_data = importdata(filepath);
+
+        if (isa(obj.loaded_data, 'struct'))
+
+            if (strcmp(obj.dir_ext, '.mat'))
+                mat_var_arr = who('-file', filepath);
+                mat_var = mat_var_arr{obj.data_col};
+                obj.loaded_data = load(filepath, mat_var);
+                obj.loaded_data = obj.loaded_data.(mat_var);
+
+                if (isa(obj.loaded_data, 'timeseries'))
+                    obj.loaded_data = rot90(obj.loaded_data.Data);
+                else
+                    obj.loaded_data = rot90(obj.loaded_data);
+                end
+
+            else
+                obj.loaded_data = rot90(obj.loaded_data.data(:, obj.data_col));
+            end
+        else
+            if (~strcmp(obj.dir_ext, '.txt'))
+                obj.loaded_data = rot90(obj.loaded_data);
+            end
+        end
 
         size_file = size(obj.loaded_data);
 
