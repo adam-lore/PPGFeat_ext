@@ -156,6 +156,10 @@ methods
         [obj.filter_sos , obj.g] = ss2sos(A,B,C,F);
 
         for i = 1:obj.size_data(1)
+            if (anynan(obj.loaded_data(i)))
+                obj.loaded_data(i, isnan(obj.loaded_data)) = 0; %replace NaN with 0
+            end
+
             %apply filter to all data
             filtered_data = filtfilt(obj.filter_sos, obj.g, obj.loaded_data(i,:));
 
@@ -588,6 +592,10 @@ methods (Access = private)
             if (~strcmp(obj.dir_ext, '.txt'))
                 obj.loaded_data = rot90(obj.loaded_data);
             end
+        end
+
+        if (anynan(obj.loaded_data))
+            obj.loaded_data(isnan(obj.loaded_data)) = 0; %replace NaN with 0
         end
 
         size_file = size(obj.loaded_data);
