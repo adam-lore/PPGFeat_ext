@@ -279,7 +279,7 @@ methods
             if (size(col_arr) == 1)
                 obj.data_col = 1;
             else
-                [obj.data_col, tf] = listdlg('SelectionMode','single', 'ListString', col_arr);
+                [obj.data_col, tf] = listdlg('PromptString', {'Select column'}, 'SelectionMode','single', 'ListString', col_arr);
             end
         end
         
