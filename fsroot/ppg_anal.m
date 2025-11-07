@@ -16,7 +16,6 @@ classdef ppg_anal < handle
         VPG % VPG segment
         APG % APG segment
         APG_SEG %to store APG segment
-        c_d_not % to detect the presence of c and d in APG
         APG_maxima %store all maxima of APG
         APG_minima %store all minima of APG
         c_d_APG %to store result of c and d presence
@@ -48,6 +47,8 @@ classdef ppg_anal < handle
         d % eate systolic re-decreasing wave
         e % early diastolic positive wave
         f % diastolic negative wave
+
+        c_d_pres % presence of c and d
 
         %Vectors for segment
 
@@ -454,7 +455,7 @@ methods
         min_value_jpg  = find(min_index_jpg);
         z_jpg = zerocrossing(Jpg);
 
-        [obj.c_d_not, obj.c, obj.d, obj.e, obj.f, obj.dn, obj.dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
+        [obj.c_d_pres, obj.c, obj.d, obj.e, obj.f, obj.dn, obj.dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
                                                     Jpg, max_value_jpg, min_value_jpg, z_apg, z_jpg, obj.T2_5);
 
         obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) obj.seg(obj.dn) obj.seg(obj.dp)];
@@ -486,6 +487,9 @@ methods
         %feature table
         obj.feature(obj.total_seg_idx,:) = [obj.OnSpDnDp O_next obj.uxvw obj.abcde F_Value obj.OnSpDnDp_time O_next_t obj.uxvw_time obj.abcde_time F_t];
 
+        %c and d presence
+        obj.c_d_APG(obj.total_seg_idx) = obj.c_d_pres;
+        
         seg_size = size(obj.PPG_SEG);
         %store segments by zero padding remaining values
         obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];

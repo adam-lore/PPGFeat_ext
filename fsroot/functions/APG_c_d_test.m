@@ -1,9 +1,9 @@
-function [c_d_not, c, d, e, f, N, D] = ...
+function [c_d_presence, c, d, e, f, N, D] = ...
     APG_c_d_test(APG, APG_maxima, APG_minima, ...
     Jpg, maxjpg, minjpg, z_apg, z_jpg,T2_5)
 
 % Initialize all outputs
-c_d_not = 0;
+c_d_presence = 1;
 [c, d, e, f, N, D] = deal(NaN);
 
 
@@ -15,7 +15,7 @@ end
 
 % Case 1: c and d are NOT present (positive c)
 if APG(APG_maxima(2)) > 0
-    c_d_not = 1;
+    c_d_presence = 0;
     disp("c and d is NOT present in APG");
 
     % Compute fallback using cal_c_d_allfeat
@@ -30,7 +30,7 @@ end
 if APG(APG_maxima(2)) < 0 && ...
         (APG_maxima(2) - APG_minima(2)) < 100
 
-    c_d_not = 0;
+    c_d_presence = 1;
     disp("c and d is present in APG");
 
     c = APG_maxima(2);
