@@ -1,10 +1,10 @@
 function [c_d_presence, c, d, e, f, N, D] = ...
     APG_c_d_test(APG, APG_maxima, APG_minima, ...
-    Jpg, maxjpg, minjpg, z_apg, z_jpg,T2_5)
+    Jpg, maxjpg, minjpg, z_apg, z_jpg, T2_5, Fs)
 
 % Initialize all outputs
 c_d_presence = 1;
-[c, d, e, f, N, D] = deal(NaN);
+[c, d, e, f, N, D] = deal(0);
 
 
 % Ensure sufficient indices
@@ -28,7 +28,7 @@ end
 
 % Case 2: c and d ARE present and close enough
 if APG(APG_maxima(2)) < 0 && ...
-        (APG_maxima(2) - APG_minima(2)) < 100
+        (APG_maxima(2) - APG_minima(2)) < ceil(Fs / 10)
 
     c_d_presence = 1;
     disp("c and d is present in APG");

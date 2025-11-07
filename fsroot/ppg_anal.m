@@ -366,7 +366,9 @@ methods
             "MinSeparation", ceil(obj.RFs/10));
     end
 
-    function CalculateFiducial(obj, min1, min2)
+    function res = CalculateFiducial(obj, min1, min2)
+        res = true;
+
         %select the segment from the filtered ppg
         obj.seg = obj.PPG_filtered(obj.total_seg_idx, (min1 - ceil(obj.RFs/67)):(min2 + ceil(obj.RFs/67)));
         %plot(obj.seg);
@@ -456,29 +458,53 @@ methods
         z_jpg = zerocrossing(Jpg);
 
         [obj.c_d_pres, obj.c, obj.d, obj.e, obj.f, obj.dn, obj.dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
-                                                    Jpg, max_value_jpg, min_value_jpg, z_apg, z_jpg, obj.T2_5);
+                                                    Jpg, max_value_jpg, min_value_jpg, z_apg, z_jpg, obj.T2_5, obj.RFs);
 
-        obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) obj.seg(obj.dn) obj.seg(obj.dp)];
+        seg_size = size(obj.PPG_SEG);
+        %store segments by zero padding remaining values
+        obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];
+        obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
 
-        obj.u = index_max_vpg(1);
-        obj.x = index_max(1);
-        obj.v = index_min_vpg(1);
-        obj.w = index_max_vpg(2);
+        if (obj.c == 0 | obj.d == 0 | obj.e == 0 | obj.f == 0 | obj.dn == 0 | obj.dp == 0 | ...
+            size(index_max_apg) < 1 | size(index_min_apg) < 1)
+            warning('Cannot calculate PPG and APG fiducial points');
+            res = false;
 
-        obj.uxvw = [obj.VPG(obj.u) obj.VPG(obj.x) obj.VPG(obj.v) obj.VPG(obj.w)];
+            obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) 0 0];
 
-        obj.a = index_max_apg(1);
-        obj.b = index_min_apg(1);
+            obj.a = 0;
+            obj.b = 0;
+            obj.abcde = [0 0 0 0 0];
+            F_Value = 0;
+        else
+            obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) obj.seg(obj.dn) obj.seg(obj.dp)];
+            obj.a = index_max_apg(1);
+            obj.b = index_min_apg(1);
+            obj.abcde = [obj.APG(obj.a) obj.APG(obj.b) obj.APG(obj.c) obj.APG(obj.d) obj.APG(obj.e)];
+            F_Value = obj.APG(obj.f);
+        end
 
-        obj.abcde = [obj.APG(obj.a) obj.APG(obj.b) obj.APG(obj.c) obj.APG(obj.d) obj.APG(obj.e)];
+        if (size(index_max_vpg) < 2 | size(index_max) < 1 | size(index_min_vpg) < 1)
+            warning('Cannot calculate VPG fiducial points');
+            res = false;
+            obj.u = 0;
+            obj.x = 0;
+            obj.v = 0;
+            obj.w = 0;
+            obj.uxvw = [0 0 0 0];
+        else
+            obj.u = index_max_vpg(1);
+            obj.x = index_max(1);
+            obj.v = index_min_vpg(1);
+            obj.w = index_max_vpg(2);
+            obj.uxvw = [obj.VPG(obj.u) obj.VPG(obj.x) obj.VPG(obj.v) obj.VPG(obj.w)];
+        end
 
         %time variables of all waveform
         obj.OnSpDnDp_time  = [obj.on obj.sp obj.dn obj.dp];
         obj.uxvw_time  = [obj.u obj.x obj.v obj.w];
         obj.abcde_time = [obj.a obj.b obj.c obj.d obj.e];
 
-        %for f values of APG
-        F_Value = obj.APG(obj.f);
         F_t = obj.f;
         %for On+1 values of PPG
         O_next_t = (min2 - min1);
@@ -489,11 +515,6 @@ methods
 
         %c and d presence
         obj.c_d_APG(obj.total_seg_idx) = obj.c_d_pres;
-        
-        seg_size = size(obj.PPG_SEG);
-        %store segments by zero padding remaining values
-        obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];
-        obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
     end
 
     function GenerateOutput(obj)
