@@ -370,6 +370,14 @@ methods
             "MinSeparation", ceil(obj.RFs/10));
     end
 
+    function [start_idx, end_idx] = FindBestCycle(obj)
+        [start_index, end_index] = obj.FindCycles();
+        [cycle_idx, quality] = CalcBestCycle(start_index, end_index, obj.PPG_filtered(obj.total_seg_idx ,:));
+        disp(quality);
+        start_idx = start_index(cycle_idx);
+        end_idx = end_index(cycle_idx);
+    end
+
     function res = CalculateFiducial(obj, min1, min2)
         res = true;
 
@@ -676,6 +684,40 @@ methods (Access = private)
         B = 1:1:obj.size_data(1);
         B = B';
         obj.Ssqi = [A B];
+    end
+
+    function [start_index, end_index] = FindCycles(obj)
+        [PPG_max, PPG_min] = FindSegMaxMin(obj);
+
+        index_PPG_max = find(PPG_max);
+        index_PPG_min = find(PPG_min);
+
+        [start_index, end_index] = deal(zeros(size(index_PPG_min)));
+
+        threshold = 40 * obj.RFs/100;
+
+        cycle_index = 0;
+
+        % Find two minima that are sufficiently far apart and has a peak in between
+        % Loop over all minima indices
+        for i = 1:length(index_PPG_min)-1
+            
+            % Check if the next minimum index is greater than the current one by
+            % the threshold value
+            if index_PPG_min(i+1) > index_PPG_min(i) + threshold
+                % If yes, check if there is any maximum index between the two minima
+                maxima_between_minima = index_PPG_max(index_PPG_max > index_PPG_min(i) & index_PPG_max < index_PPG_min(i+1));
+                if ~isempty(maxima_between_minima)
+                    cycle_index = cycle_index + 1;
+
+                    start_index(cycle_index) = index_PPG_min(i);
+                    end_index(cycle_index) = index_PPG_min(i+1);
+                end
+            end
+        end
+
+        start_index = resize(start_index, cycle_index);
+        end_index = resize(end_index, cycle_index); 
     end
 end
 

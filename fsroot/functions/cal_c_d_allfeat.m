@@ -5,9 +5,14 @@ disp("cal_c_d_allfeat is running now");
     [N, D, c, d, e, f] = deal(0);
     
 
-    if length(maxapg) >= 2 && length(minjpg) >= 2
+    if length(maxapg) < 2 && length(minjpg) < 2
         warning('Not enough APG extrema for reliable c/d detection.');
         
+    end
+
+    if length(z_jpg) < 4
+        warning('Not enough JPG zero crossings for reliable c/d detection.');
+        return;
     end
     
  
