@@ -372,8 +372,15 @@ methods
 
     function [start_idx, end_idx] = FindBestCycle(obj)
         [start_index, end_index] = obj.FindCycles();
-        [cycle_idx, quality] = CalcBestCycle(start_index, end_index, obj.PPG_filtered(obj.total_seg_idx ,:));
+        [cycle_idx, quality] = CalcBestCycle(start_index, end_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
         disp(quality);
+
+        if cycle_idx == 0
+            start_idx = 0;
+            end_idx = 0;
+            return
+        end
+
         start_idx = start_index(cycle_idx);
         end_idx = end_index(cycle_idx);
     end
