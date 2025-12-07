@@ -45,7 +45,7 @@ function [index, quality] = CalcBestCycle(start_index, end_index, peak_index, RF
 
     
     
-    for i = 1:length(start_index)
+    for i = 1 + start_buffer:length(start_index) - end_buffer
         
         % Add a second before and after cycle
         p1 = start_index(i) - RFs;
@@ -61,17 +61,17 @@ function [index, quality] = CalcBestCycle(start_index, end_index, peak_index, RF
         % Get correlation ccoefficient between cycle and median cycle
         if num_cycle > 1
             corr_coef = corrcoef(centered_cycles(i, :), mean_cycle);
-            curr_quality = corr_coef(1, 2);
+            corr_quality = corr_coef(1, 2);
+        else
+            corr_quality = 1;
         end
 
-        %{
         %Get skewness for cycle plus, upto, 1 seconds before and after
-        curr_quality = skewness(PPG(p1:p2));
-        %}
+        skew_quality = skewness(PPG(p1:p2));
 
-        if curr_quality > quality
+        if (corr_quality * skew_quality) > quality
             index = i;
-            quality = curr_quality;
+            quality = (corr_quality * skew_quality);
         end
     end
     return;
