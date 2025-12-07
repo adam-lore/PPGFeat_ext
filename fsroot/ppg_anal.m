@@ -371,8 +371,8 @@ methods
     end
 
     function [start_idx, end_idx] = FindBestCycle(obj)
-        [start_index, end_index] = obj.FindCycles();
-        [cycle_idx, quality] = CalcBestCycle(start_index, end_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
+        [start_index, end_index, peak_index] = obj.FindCycles();
+        [cycle_idx, quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
         disp(quality);
 
         if cycle_idx == 0
@@ -693,13 +693,14 @@ methods (Access = private)
         obj.Ssqi = [A B];
     end
 
-    function [start_index, end_index] = FindCycles(obj)
+    function [start_index, end_index, peak_index] = FindCycles(obj)
         [PPG_max, PPG_min] = FindSegMaxMin(obj);
 
         index_PPG_max = find(PPG_max);
         index_PPG_min = find(PPG_min);
 
-        [start_index, end_index] = deal(zeros(size(index_PPG_min)));
+        % Set start, end and peak index arrays to zero of size index_PPG_min
+        [start_index, end_index, peak_index] = deal(zeros(size(index_PPG_min)));
 
         threshold = 40 * obj.RFs/100;
 
@@ -719,12 +720,26 @@ methods (Access = private)
 
                     start_index(cycle_index) = index_PPG_min(i);
                     end_index(cycle_index) = index_PPG_min(i+1);
+
+                    peak_index(cycle_index) = maxima_between_minima(1);
+                    peak_value = obj.PPG_filtered(maxima_between_minima(1));
+
+                    % Find the highest peak in the cycle
+                    if length(maxima_between_minima) > 1
+                        for j = 2:length(maxima_between_minima)
+                            if PPG(maxima_between_minima(j)) > peak_value
+                                peak_index(cycle_index) = maxima_between_minima(j);
+                                peak_value = obj.PPG_filtered(maxima_between_minima(j));
+                            end
+                        end
+                    end
                 end
             end
         end
 
         start_index = resize(start_index, cycle_index);
         end_index = resize(end_index, cycle_index); 
+        peak_index = resize(peak_index, cycle_index);
     end
 end
 
