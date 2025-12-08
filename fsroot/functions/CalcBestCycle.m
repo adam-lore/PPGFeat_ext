@@ -1,10 +1,13 @@
-function [index, quality] = CalcBestCycle(start_index, end_index, peak_index, RFs, PPG)
+function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, RFs, PPG)
     % How many cycles at the start/end to cut off
     start_buffer = 0;
     end_buffer = 0;
 
     index = 0;
+    corr_sum = 0;
     quality = 0;
+    max_corr_quality = 0;
+    max_skew_quality = 0;
     seg_len = length(PPG);
 
     num_cycle = length(start_index);
@@ -32,7 +35,7 @@ function [index, quality] = CalcBestCycle(start_index, end_index, peak_index, RF
             if i2 > seg_len
                 end_buffer = end_buffer + 1;
                 % Remove flast column
-                centered_cycles(length(start_index),:) = [];
+                centered_cycles(num_cycle,:) = [];
                 continue;
             end
             
@@ -45,7 +48,7 @@ function [index, quality] = CalcBestCycle(start_index, end_index, peak_index, RF
 
     
     
-    for i = 1 + start_buffer:length(start_index) - end_buffer
+    for i = 1 + start_buffer:num_cycle - end_buffer
         
         % Add a second before and after cycle
         p1 = start_index(i) - RFs;
@@ -62,6 +65,7 @@ function [index, quality] = CalcBestCycle(start_index, end_index, peak_index, RF
         if num_cycle > 1
             corr_coef = corrcoef(centered_cycles(i, :), mean_cycle);
             corr_quality = corr_coef(1, 2);
+            corr_sum = corr_sum + corr_quality;
         else
             corr_quality = 1;
         end
@@ -69,10 +73,17 @@ function [index, quality] = CalcBestCycle(start_index, end_index, peak_index, RF
         %Get skewness for cycle plus, upto, 1 seconds before and after
         skew_quality = skewness(PPG(p1:p2));
 
-        if (corr_quality * skew_quality) > quality
+        if (corr_quality * (skew_quality / 2)) > quality
             index = i;
-            quality = (corr_quality * skew_quality);
+            quality = (corr_quality * skew_quality / 2);
+            max_corr_quality = corr_quality;
+            max_skew_quality = skew_quality;
         end
     end
+
+    corr_quality = max_corr_quality;
+    skew_quality = max_skew_quality;
+    
+    seg_quality = corr_sum / (num_cycle - start_buffer - end_buffer);
     return;
 end

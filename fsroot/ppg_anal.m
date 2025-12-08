@@ -370,10 +370,9 @@ methods
             "MinSeparation", ceil(obj.RFs/10));
     end
 
-    function [start_idx, end_idx] = FindBestCycle(obj)
+    function [start_idx, end_idx, corr_qulity, skew_quality, seg_quality] = FindBestCycle(obj)
         [start_index, end_index, peak_index] = obj.FindCycles();
-        [cycle_idx, quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
-        disp(quality);
+        [cycle_idx, corr_qulity, skew_quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
 
         if cycle_idx == 0
             start_idx = 0;
@@ -456,12 +455,15 @@ methods
         obj.APG_maxima = index_max_apg;
         obj.APG_minima = index_min_apg;
 
-        %read all the feature points from PPG VPG and APG
-        obj.on = index_min(1);
-        obj.sp = index_max(1);
-
-        %check the presence of c and d
-        %obj.APG_c_d_test();
+        if length(index_min) < 1 || length(index_max) < 1
+            warning('Cannot calculate PPG');
+            obj.on = 0;
+            obj.sp = 0;
+        else
+            %read all the feature points from PPG VPG and APG
+            obj.on = index_min(1);
+            obj.sp = index_max(1);
+        end
 
         z_apg = zerocrossing(obj.APG);
         Jpg = diff(obj.APG)*1000;
@@ -484,12 +486,16 @@ methods
         obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];
         obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
 
-        if (obj.c == 0 | obj.d == 0 | obj.e == 0 | obj.f == 0 | obj.dn == 0 | obj.dp == 0 | ...
-            size(index_max_apg) < 1 | size(index_min_apg) < 1)
+        if (obj.c == 0 || obj.d == 0 || obj.e == 0 || obj.f == 0 || obj.dn == 0 || obj.dp == 0 || ...
+            obj.on == 0 || obj.sp == 0 | length(index_max_apg) < 1 | length(index_min_apg) < 1)
             warning('Cannot calculate PPG and APG fiducial points');
             res = false;
 
-            obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) 0 0];
+            if obj.on == 0 || obj.sp == 0
+                obj.OnSpDnDp = [0 0 0 0];
+            else
+                obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) 0 0];
+            end
 
             obj.a = 0;
             obj.b = 0;
