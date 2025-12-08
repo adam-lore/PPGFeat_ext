@@ -5,7 +5,7 @@ function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_
 
     index = 0;
     corr_sum = 0;
-    quality = 0;
+    quality = -100;
     max_corr_quality = 0;
     max_skew_quality = 0;
     seg_len = length(PPG);
@@ -14,7 +14,7 @@ function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_
 
     mean_cycle = 0;
 
-    if num_cycle > 1
+    if num_cycle > 2
         % Calculate the mean beat-to-beat interval
         mean_interval = ceil((peak_index(num_cycle) - peak_index(1)) / (num_cycle - 1));
 
@@ -62,7 +62,7 @@ function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_
         end
 
         % Get correlation ccoefficient between cycle and median cycle
-        if num_cycle > 1
+        if num_cycle > 2
             corr_coef = corrcoef(centered_cycles(i, :), mean_cycle);
             corr_quality = corr_coef(1, 2);
             corr_sum = corr_sum + corr_quality;
