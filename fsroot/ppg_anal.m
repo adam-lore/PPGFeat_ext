@@ -15,6 +15,7 @@ classdef ppg_anal < handle
         SEG_min_max % Description
         VPG % VPG segment
         APG % APG segment
+        JPG % JPG segment
         APG_SEG %to store APG segment
         APG_maxima %store all maxima of APG
         APG_minima %store all minima of APG
@@ -402,6 +403,9 @@ methods
         %obj.APG = smoothdata(obj.APG, "movmean", 65); %data smoothing using 65 ms window at 1000Hz
         %plot(obj.APG);
 
+        obj.JPG = diff(obj.APG)*1000;
+        obj.JPG = smoothdata(obj.JPG,"movmean", ceil(obj.RFs/12)); %data smoothing using 85 ms window at 1000Hz
+
         %create matrix for segment information
         obj.SEG_min_max(obj.total_seg_idx,1) = obj.Sub_ID;
         obj.SEG_min_max(obj.total_seg_idx,2) = min1 - ceil(obj.RFs/67);
@@ -466,20 +470,18 @@ methods
         end
 
         z_apg = zerocrossing(obj.APG);
-        Jpg = diff(obj.APG)*1000;
-        Jpg = smoothdata(Jpg,"movmean", ceil(obj.RFs/12)); %data smoothing using 85 ms window at 1000Hz
 
-        max_index_jpg = islocalmax(Jpg,"MinProminence",40,"FlatSelection","all",...
+        max_index_jpg = islocalmax(obj.JPG,"MinProminence",40,"FlatSelection","all",...
             "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",5);
-        min_index_jpg = islocalmin(Jpg,"MinProminence",50,"FlatSelection","all",...
+        min_index_jpg = islocalmin(obj.JPG,"MinProminence",50,"FlatSelection","all",...
             "MinSeparation",ceil(obj.RFs/20) ,"MaxNumExtrema",5);
 
         max_value_jpg = find(max_index_jpg); %first point of jpg is not detected
         min_value_jpg  = find(min_index_jpg);
-        z_jpg = zerocrossing(Jpg);
+        z_jpg = zerocrossing(obj.JPG);
 
         [obj.c_d_pres, obj.c, obj.d, obj.e, obj.f, obj.dn, obj.dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
-                                                    Jpg, max_value_jpg, min_value_jpg, z_apg, z_jpg, obj.T2_5, obj.RFs);
+                                                    obj.JPG, max_value_jpg, min_value_jpg, z_apg, z_jpg, obj.T2_5, obj.RFs);
 
         seg_size = size(obj.PPG_SEG);
         %store segments by zero padding remaining values
