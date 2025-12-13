@@ -34,6 +34,7 @@ classdef ppg_anal < handle
         sp % systolic peak
         dn % dicrotic notch
         dp % diastolic peak
+        off % offset
 
         % For VPG Segments
         u % global maxima in systolic phase
@@ -53,14 +54,14 @@ classdef ppg_anal < handle
 
         %Vectors for segment
 
-        OnSpDnDp %for PPG
+        OnSpDnDpOff %for PPG
         uxvw %for VPG
-        abcde %for APG
+        abcdef %for APG
         feature %store feature table
 
-        OnSpDnDp_time % dt values of PPG
+        OnSpDnDpOff_time % dt values of PPG
         uxvw_time % dt values of VPG
-        abcde_time % dt values of APG
+        abcdef_time % dt values of APG
 
         entry_and_seg_id % id of the entry and the segment of the entry
     end
@@ -463,10 +464,12 @@ methods
             warning('Cannot calculate PPG');
             obj.on = 0;
             obj.sp = 0;
+            obj.off = 0;
         else
             %read all the feature points from PPG VPG and APG
             obj.on = index_min(1);
             obj.sp = index_max(1);
+            obj.off = index_min(end);
         end
 
         z_apg = zerocrossing(obj.APG);
@@ -489,26 +492,24 @@ methods
         obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
 
         if (obj.c == 0 || obj.d == 0 || obj.e == 0 || obj.f == 0 || obj.dn == 0 || obj.dp == 0 || ...
-            obj.on == 0 || obj.sp == 0 | length(index_max_apg) < 1 | length(index_min_apg) < 1)
+            obj.on == 0 || obj.sp == 0 || obj.off == 0 | length(index_max_apg) < 1 | length(index_min_apg) < 1)
             warning('Cannot calculate PPG and APG fiducial points');
             res = false;
 
-            if obj.on == 0 || obj.sp == 0
-                obj.OnSpDnDp = [0 0 0 0];
+            if obj.on == 0 || obj.sp == 0 || obj.off == 0
+                obj.OnSpDnDpOff = [0 0 0 0 0];
             else
-                obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) 0 0];
+                obj.OnSpDnDpOff = [obj.seg(obj.on) obj.seg(obj.sp) 0 0 obj.seg(obj.off)];
             end
 
             obj.a = 0;
             obj.b = 0;
-            obj.abcde = [0 0 0 0 0];
-            F_Value = 0;
+            obj.abcdef = [0 0 0 0 0 0];
         else
-            obj.OnSpDnDp = [obj.seg(obj.on) obj.seg(obj.sp) obj.seg(obj.dn) obj.seg(obj.dp)];
+            obj.OnSpDnDpOff = [obj.seg(obj.on) obj.seg(obj.sp) obj.seg(obj.dn) obj.seg(obj.dp) obj.seg(obj.off)];
             obj.a = index_max_apg(1);
             obj.b = index_min_apg(1);
-            obj.abcde = [obj.APG(obj.a) obj.APG(obj.b) obj.APG(obj.c) obj.APG(obj.d) obj.APG(obj.e)];
-            F_Value = obj.APG(obj.f);
+            obj.abcdef = [obj.APG(obj.a) obj.APG(obj.b) obj.APG(obj.c) obj.APG(obj.d) obj.APG(obj.e) obj.APG(obj.f)];
         end
 
         if (size(index_max_vpg) < 2 | size(index_max) < 1 | size(index_min_vpg) < 1)
@@ -528,17 +529,12 @@ methods
         end
 
         %time variables of all waveform
-        obj.OnSpDnDp_time  = [obj.on obj.sp obj.dn obj.dp];
+        obj.OnSpDnDpOff_time  = [obj.on obj.sp obj.dn obj.dp obj.off];
         obj.uxvw_time  = [obj.u obj.x obj.v obj.w];
-        obj.abcde_time = [obj.a obj.b obj.c obj.d obj.e];
-
-        F_t = obj.f;
-        %for On+1 values of PPG
-        O_next_t = (min2 - min1);
-        O_next = obj.seg(O_next_t);
+        obj.abcdef_time = [obj.a obj.b obj.c obj.d obj.e obj.f];
 
         %feature table
-        obj.feature(obj.total_seg_idx,:) = [obj.OnSpDnDp O_next obj.uxvw obj.abcde F_Value obj.OnSpDnDp_time O_next_t obj.uxvw_time obj.abcde_time F_t];
+        obj.feature(obj.total_seg_idx,:) = [obj.OnSpDnDpOff obj.uxvw obj.abcdef obj.OnSpDnDpOff_time obj.uxvw_time obj.abcdef_time];
 
         %c and d presence
         obj.c_d_APG(obj.total_seg_idx) = obj.c_d_pres;
