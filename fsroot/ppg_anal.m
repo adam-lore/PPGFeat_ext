@@ -50,7 +50,7 @@ classdef ppg_anal < handle
     properties (Access = private)
         is_dir % wheter data is loaded from a directory or a file
         dir_files % to store files in directory
-        num_files % number of files in directory
+        num_entries % number of files in directory
         dir_ext % extension of files in directory to load
         data_col % what column the data is in
         filter_sos % filter 
@@ -113,6 +113,7 @@ methods
         end
 
         obj.size_data = size(obj.loaded_data); %read size of loaded data
+        obj.num_entries = obj.size_data(1);
 
         if (is_seg)
             obj.num_seg = ceil(obj.size_data(2) / ((seg_len * OFs) / 1000)); %max number of segments each entry is divided into
@@ -256,9 +257,9 @@ methods
         obj.dir_files = dir([path, '\*' obj.dir_ext]);
 
         obj.size_data = [size(obj.dir_files), 1]; %read number of entries
-        obj.num_files = obj.size_data(1);
+        obj.num_entries = obj.size_data(1);
 
-        if (obj.num_files == 0)
+        if (obj.num_entries == 0)
             res = false;
             return
         end
@@ -335,7 +336,7 @@ methods
             obj.total_seg_idx = obj.total_seg_idx + 1;
             res = true;
             return
-        elseif (obj.entry_idx < obj.size_data(1))
+        elseif (obj.entry_idx < obj.num_entries)
 
             obj.entry_idx = obj.entry_idx + 1;
             obj.total_seg_idx = obj.total_seg_idx + 1;
@@ -366,12 +367,19 @@ methods
     end
 
     function [start_idx, end_idx, corr_qulity, skew_quality, seg_quality] = FindBestCycle(obj)
+        if obj.entry_idx == 12 && obj.seg_idx == 25
+            warning('Break reached');
+        end
+
+
         [start_index, end_index, peak_index] = obj.FindCycles();
         [cycle_idx, corr_qulity, skew_quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
 
         if cycle_idx == 0
             start_idx = 0;
             end_idx = 0;
+            skew_quality = 0;
+            seg_quality = 0;
             return
         end
 
@@ -396,6 +404,11 @@ methods
 
             next_u = find(PPG_vpg_max, 1); %index of maxima points
 
+            if isempty(next_u)
+                res = false;
+                return
+            end
+
             feature_struct  = CalcFeatures(obj.OnSpDnDpOff, obj.uxvw, next_u, obj.abcdef, obj.OnSpDnDpOff_time, obj.uxvw_time, obj.abcdef_time, obj.seg, obj.VPG, obj.APG, obj.RFs);
 
             obj.feature.total(obj.total_seg_idx,:) = feature_struct.total;
@@ -411,6 +424,17 @@ methods
 
     function res = CalculateFiducial(obj, min1, min2)
         res = true;
+
+        if min2 == 0
+            res = false;
+            obj.SEG_min_max(obj.total_seg_idx,1) = obj.Sub_ID;
+            return;
+        end
+
+        %create matrix for segment information
+        obj.SEG_min_max(obj.total_seg_idx,1) = obj.Sub_ID;
+        obj.SEG_min_max(obj.total_seg_idx,2) = min1 - ceil(obj.RFs/50);
+        obj.SEG_min_max(obj.total_seg_idx,3) = min2 + ceil(obj.RFs/50);
 
         %select the segment from the filtered ppg
         obj.seg = obj.PPG_filtered(obj.total_seg_idx, (min1 - ceil(obj.RFs/50)):(min2 + ceil(obj.RFs/50)));
@@ -429,11 +453,6 @@ methods
 
         obj.JPG = diff(obj.APG)*1000;
         obj.JPG = smoothdata(obj.JPG,"movmean", ceil(obj.RFs/12)); %data smoothing using 85 ms window at 1000Hz
-
-        %create matrix for segment information
-        obj.SEG_min_max(obj.total_seg_idx,1) = obj.Sub_ID;
-        obj.SEG_min_max(obj.total_seg_idx,2) = min1 - ceil(obj.RFs/50);
-        obj.SEG_min_max(obj.total_seg_idx,3) = min2 + ceil(obj.RFs/50);
 
         %find maxima and minima of current ppg segment
         PPG_SEG_max = islocalmax(obj.seg,"MinProminence",0.1,"FlatSelection","all",...
@@ -559,7 +578,7 @@ methods
         %c and d presence
         obj.c_d_APG(obj.total_seg_idx) = obj.c_d_pres;
 
-        if length(obj.PPG_filtered) < min2 + ceil(obj.RFs/4)
+        if length(obj.PPG_filtered(obj.total_seg_idx, :)) < min2 + ceil(obj.RFs/4)
             res = false;
         else
             %find systolic peak of next cycle
@@ -621,6 +640,20 @@ methods
         save 'Results30Jan' 'SMM' 'P_feat' 'C_D' 'index','-mat';
     end
 
+    %calculate features for every entry in the loaded dataset
+    function ProcessDataset(obj)
+        working = true;
+        progress = waitbar(0, sprintf('Entry: %d/%d Segment: %d', obj.entry_idx, obj.num_entries, obj.seg_idx), 'Name', 'Processing data');
+
+        while working
+            waitbar(obj.entry_idx/obj.num_entries, progress, ...
+                    sprintf('Entry: %d/%d Segment: %d', obj.entry_idx, obj.num_entries, obj.seg_idx))
+            [min1, min2] = obj.FindBestCycle();
+            obj.CalculateFiducial(min1, min2);
+            working = obj.Next();
+        end
+        delete(progress);
+    end
 end
 
 methods (Access = private)
@@ -673,8 +706,8 @@ methods (Access = private)
             obj.APG_SEG = resize(obj.APG_SEG, [obj.size_data(1) ceil((obj.size_data(2) - (obj.size_data(2)/3)) * (obj.RFs / obj.OFs))]);
         
             %if the assumed total number of segemnts after division is larger than previously assumed, resize array to fit assumtion
-        elseif (obj.is_seg == true && obj.total_seg_idx + (obj.num_files - obj.entry_idx + 1) * obj.num_seg > obj.size_data(1))
-            obj.size_data(1) = obj.total_seg_idx + (obj.num_files - obj.entry_idx + 1) * obj.num_seg;
+        elseif (obj.is_seg == true && obj.total_seg_idx + (obj.num_entries - obj.entry_idx + 1) * obj.num_seg > obj.size_data(1))
+            obj.size_data(1) = obj.total_seg_idx + (obj.num_entries - obj.entry_idx + 1) * obj.num_seg;
             obj.SEG_min_max = resize(obj.SEG_min_max, [obj.size_data(1) 3]);
             obj.PPG_filtered = resize(obj.PPG_filtered, [obj.size_data(1) obj.size_data(2)]);
             obj.PPG_SEG = resize(obj.PPG_SEG, [obj.size_data(1) obj.size_data(2)]);

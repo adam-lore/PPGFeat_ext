@@ -16,7 +16,7 @@ end
 % Case 1: c and d are NOT present (positive c)
 if APG(APG_maxima(2)) > 0
     c_d_presence = 0;
-    disp("c and d is NOT present in APG");
+    %disp("c and d is NOT present in APG");
 
     % Compute fallback using cal_c_d_allfeat
     [N, D, c, d,e, f ] = ...
@@ -31,7 +31,7 @@ if APG(APG_maxima(2)) < 0 && ...
         (APG_maxima(2) - APG_minima(2)) < ceil(Fs / 10)
 
     c_d_presence = 1;
-    disp("c and d is present in APG");
+    %disp("c and d is present in APG");
 
     c = APG_maxima(2);
     d = APG_minima(2);
