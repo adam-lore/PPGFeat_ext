@@ -29,27 +29,6 @@ classdef ppg_anal < handle
         num_seg %number of segments each entry is divided into
         T2_5 %2.5 % of total length of selected segment
 
-        % For PPG Segments
-        on % onset
-        sp % systolic peak
-        dn % dicrotic notch
-        dp % diastolic peak
-        off % offset
-
-        % For VPG Segments
-        u % global maxima in systolic phase
-        x % local maxima in systolic phase
-        v % global minima in systolic phase
-        w % first local maxima in diastolic phase
-
-        % For APG Segments
-        a % early systolic positive peak
-        b % early systolic negative peak
-        c % late systolic re-increasing wave
-        d % eate systolic re-decreasing wave
-        e % early diastolic positive wave
-        f % diastolic negative wave
-
         c_d_pres % presence of c and d
 
         %Vectors for segment
@@ -62,6 +41,8 @@ classdef ppg_anal < handle
         OnSpDnDpOff_time % dt values of PPG
         uxvw_time % dt values of VPG
         abcdef_time % dt values of APG
+
+        next_peak % systolic peak of next cycle
 
         entry_and_seg_id % id of the entry and the segment of the entry
     end
@@ -214,12 +195,19 @@ methods
         end
 
         %initialize the variables
-        obj.OnSpDnDp = zeros(1,4);
+        obj.OnSpDnDpOff = zeros(1,4);
         obj.uxvw = zeros(1,4);
-        obj.abcde = zeros(1,5);
-        obj.feature = zeros(obj.size_data(1) * obj.num_seg, 30);
-        obj.c_d_APG = zeros(obj.size_data(1) * obj.num_seg, 1);
-        obj.entry_and_seg_id = zeros(obj.size_data(1) * obj.num_seg, 2);
+        obj.abcdef = zeros(1,5);
+
+        total_seg = obj.size_data(1) * obj.num_seg;
+
+        obj.feature = struct('total', zeros(total_seg,147), 'fiducial_value', zeros(total_seg,15), 'fiducial_time', zeros(total_seg,15), ...
+                                'timespan', zeros(total_seg,23), 'amplitude', zeros(total_seg,14), ...
+                                'vpg_apg', zeros(total_seg,12), 'waveform_area', zeros(total_seg,4), ...
+                                'power_area', zeros(total_seg,15), 'ratio', zeros(total_seg,33), 'slope', zeros(total_seg,16));
+
+        obj.c_d_APG = zeros(total_seg, 1);
+        obj.entry_and_seg_id = zeros(total_seg, 2);
 
         % Create empty Ssqi values
         A = ones(obj.size_data(1),1);
@@ -310,10 +298,15 @@ methods
         obj.APG_SEG = obj.PPG_filtered;
 
         %initialize the variables
-        obj.OnSpDnDp = zeros(1,4);
+        obj.OnSpDnDpOff = zeros(1,4);
         obj.uxvw = zeros(1,4);
-        obj.abcde = zeros(1,5);
-        obj.feature = zeros(obj.size_data(1), 30);
+        obj.abcdef = zeros(1,5);
+
+        obj.feature = struct('total', zeros(obj.size_data(1),147), 'fiducial_value', zeros(obj.size_data(1),15), 'fiducial_time', zeros(obj.size_data(1),15), ...
+                                'timespan', zeros(obj.size_data(1),23), 'amplitude', zeros(obj.size_data(1),14), ...
+                                'vpg_apg', zeros(obj.size_data(1),12), 'waveform_area', zeros(obj.size_data(1),4), ...
+                                'power_area', zeros(obj.size_data(1),15), 'ratio', zeros(obj.size_data(1),33), 'slope', zeros(obj.size_data(1),16));
+        
         obj.c_d_APG = zeros(obj.size_data(1), 1);
         obj.entry_and_seg_id = zeros(obj.size_data(1), 2);
 
@@ -386,11 +379,41 @@ methods
         end_idx = end_index(cycle_idx);
     end
 
+    function res = UpdateFeatures(obj)
+        min2 = obj.SEG_min_max(obj.total_seg_idx,3);
+
+        if length(obj.PPG_filtered) < obj.next_peak || min2 >= obj.next_peak
+            res = false;
+        else
+
+            %calculate u of the next cycle which is needed to calculate extra features
+            seg_next_max = obj.PPG_filtered(obj.total_seg_idx, min2:obj.next_peak);
+            seg_next_VPG = diff(seg_next_max)*1000;
+            seg_next_VPG = smoothdata(seg_next_VPG, "movmean", ceil(obj.RFs/20)); %data smoothing using 50 ms window at 1000Hz
+            
+            PPG_vpg_max = islocalmax(seg_next_VPG,"MinProminence",0.2,"FlatSelection","all",...
+                "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",3);
+
+            next_u = find(PPG_vpg_max, 1); %index of maxima points
+
+            feature_struct  = CalcFeatures(obj.OnSpDnDpOff, obj.uxvw, next_u, obj.abcdef, obj.OnSpDnDpOff_time, obj.uxvw_time, obj.abcdef_time, obj.seg, obj.VPG, obj.APG, obj.RFs);
+
+            obj.feature.total(obj.total_seg_idx,:) = feature_struct.total;
+            obj.feature.fiducial_value(obj.total_seg_idx,:) = feature_struct.fiducial_value;
+            obj.feature.fiducial_time(obj.total_seg_idx,:) = feature_struct.fiducial_time;
+            obj.feature.timespan(obj.total_seg_idx,:) = feature_struct.timespan;
+            obj.feature.amplitude(obj.total_seg_idx,:) = feature_struct.amplitude;
+            obj.feature.vpg_apg(obj.total_seg_idx,:) = feature_struct.vpg_apg;
+            obj.feature.waveform_area(obj.total_seg_idx,:) = feature_struct.waveform_area;
+            obj.feature.ratio(obj.total_seg_idx,:) = feature_struct.ratio;
+        end
+    end
+
     function res = CalculateFiducial(obj, min1, min2)
         res = true;
 
         %select the segment from the filtered ppg
-        obj.seg = obj.PPG_filtered(obj.total_seg_idx, (min1 - ceil(obj.RFs/67)):(min2 + ceil(obj.RFs/67)));
+        obj.seg = obj.PPG_filtered(obj.total_seg_idx, (min1 - ceil(obj.RFs/50)):(min2 + ceil(obj.RFs/50)));
         %plot(obj.seg);
         %calculate 2.5% of T
         obj.T2_5 = floor((((min2 - min1))/100)*2.5);
@@ -409,8 +432,8 @@ methods
 
         %create matrix for segment information
         obj.SEG_min_max(obj.total_seg_idx,1) = obj.Sub_ID;
-        obj.SEG_min_max(obj.total_seg_idx,2) = min1 - ceil(obj.RFs/67);
-        obj.SEG_min_max(obj.total_seg_idx,3) = min2 + ceil(obj.RFs/67);
+        obj.SEG_min_max(obj.total_seg_idx,2) = min1 - ceil(obj.RFs/50);
+        obj.SEG_min_max(obj.total_seg_idx,3) = min2 + ceil(obj.RFs/50);
 
         %find maxima and minima of current ppg segment
         PPG_SEG_max = islocalmax(obj.seg,"MinProminence",0.1,"FlatSelection","all",...
@@ -462,14 +485,14 @@ methods
 
         if length(index_min) < 1 || length(index_max) < 1
             warning('Cannot calculate PPG');
-            obj.on = 0;
-            obj.sp = 0;
-            obj.off = 0;
+            onset = 0;
+            sp = 0;
+            offset = 0;
         else
             %read all the feature points from PPG VPG and APG
-            obj.on = index_min(1);
-            obj.sp = index_max(1);
-            obj.off = index_min(end);
+            onset = index_min(1);
+            sp = index_max(1);
+            offset = index_min(end);
         end
 
         z_apg = zerocrossing(obj.APG);
@@ -483,7 +506,7 @@ methods
         min_value_jpg  = find(min_index_jpg);
         z_jpg = zerocrossing(obj.JPG);
 
-        [obj.c_d_pres, obj.c, obj.d, obj.e, obj.f, obj.dn, obj.dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
+        [obj.c_d_pres, c, d, e, f, dn, dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
                                                     obj.JPG, max_value_jpg, min_value_jpg, z_apg, z_jpg, obj.T2_5, obj.RFs);
 
         seg_size = size(obj.PPG_SEG);
@@ -491,94 +514,111 @@ methods
         obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];
         obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
 
-        if (obj.c == 0 || obj.d == 0 || obj.e == 0 || obj.f == 0 || obj.dn == 0 || obj.dp == 0 || ...
-            obj.on == 0 || obj.sp == 0 || obj.off == 0 | length(index_max_apg) < 1 | length(index_min_apg) < 1)
+        if (c == 0 || d == 0 || e == 0 || f == 0 || dn == 0 || dp == 0 || ...
+            onset == 0 || sp == 0 || offset == 0 | length(index_max_apg) < 1 | length(index_min_apg) < 1)
             warning('Cannot calculate PPG and APG fiducial points');
             res = false;
 
-            if obj.on == 0 || obj.sp == 0 || obj.off == 0
+            if onset == 0 || sp == 0 || offset == 0
                 obj.OnSpDnDpOff = [0 0 0 0 0];
             else
-                obj.OnSpDnDpOff = [obj.seg(obj.on) obj.seg(obj.sp) 0 0 obj.seg(obj.off)];
+                obj.OnSpDnDpOff = [obj.seg(onset) obj.seg(sp) 0 0 obj.seg(offset)];
             end
 
-            obj.a = 0;
-            obj.b = 0;
+            a = 0;
+            b = 0;
             obj.abcdef = [0 0 0 0 0 0];
         else
-            obj.OnSpDnDpOff = [obj.seg(obj.on) obj.seg(obj.sp) obj.seg(obj.dn) obj.seg(obj.dp) obj.seg(obj.off)];
-            obj.a = index_max_apg(1);
-            obj.b = index_min_apg(1);
-            obj.abcdef = [obj.APG(obj.a) obj.APG(obj.b) obj.APG(obj.c) obj.APG(obj.d) obj.APG(obj.e) obj.APG(obj.f)];
+            obj.OnSpDnDpOff = [obj.seg(onset) obj.seg(sp) obj.seg(dn) obj.seg(dp) obj.seg(offset)];
+            a = index_max_apg(1);
+            b = index_min_apg(1);
+            obj.abcdef = [obj.APG(a) obj.APG(b) obj.APG(c) obj.APG(d) obj.APG(e) obj.APG(f)];
         end
 
         if (size(index_max_vpg) < 2 | size(index_max) < 1 | size(index_min_vpg) < 1)
             warning('Cannot calculate VPG fiducial points');
             res = false;
-            obj.u = 0;
-            obj.x = 0;
-            obj.v = 0;
-            obj.w = 0;
+            u = 0;
+            x = 0;
+            v = 0;
+            w = 0;
             obj.uxvw = [0 0 0 0];
         else
-            obj.u = index_max_vpg(1);
-            obj.x = index_max(1);
-            obj.v = index_min_vpg(1);
-            obj.w = index_max_vpg(2);
-            obj.uxvw = [obj.VPG(obj.u) obj.VPG(obj.x) obj.VPG(obj.v) obj.VPG(obj.w)];
+            u = index_max_vpg(1);
+            x = index_max(1);
+            v = index_min_vpg(1);
+            w = index_max_vpg(2);
+            obj.uxvw = [obj.VPG(u) obj.VPG(x) obj.VPG(v) obj.VPG(w)];
         end
 
         %time variables of all waveform
-        obj.OnSpDnDpOff_time  = [obj.on obj.sp obj.dn obj.dp obj.off];
-        obj.uxvw_time  = [obj.u obj.x obj.v obj.w];
-        obj.abcdef_time = [obj.a obj.b obj.c obj.d obj.e obj.f];
-
-        %feature table
-        obj.feature(obj.total_seg_idx,:) = [obj.OnSpDnDpOff obj.uxvw obj.abcdef obj.OnSpDnDpOff_time obj.uxvw_time obj.abcdef_time];
-
+        obj.OnSpDnDpOff_time  = [onset sp dn dp offset];
+        obj.uxvw_time  = [u x v w];
+        obj.abcdef_time = [a b c d e f];
+        
         %c and d presence
         obj.c_d_APG(obj.total_seg_idx) = obj.c_d_pres;
+
+        if length(obj.PPG_filtered) < min2 + ceil(obj.RFs/4)
+            res = false;
+        else
+            %find systolic peak of next cycle
+            next_cycle_seg = obj.PPG_filtered(obj.total_seg_idx , min2:(min2 + ceil(obj.RFs/4)));
+            %find maxima and minima of current segment
+            next_max = islocalmax(next_cycle_seg ,"MinProminence",0.1,"FlatSelection","all",...
+                "MinSeparation", ceil(obj.RFs/5));
+            obj.next_peak = find(next_max, 1) + min2;
+            if isempty(obj.next_peak)
+                res = false;
+            end
+        end
+        if res == true
+            UpdateFeatures(obj);
+        end
     end
 
     function GenerateOutput(obj)
 
+        disp("generating output");
+
         %save segmented data of PPG for zero padded values
-        arr_size = size(obj.PPG_SEG);
-        obj.PPG_SEG = resize(obj.PPG_SEG, [obj.total_seg_idx arr_size(2)]);
-        writematrix(obj.PPG_SEG, 'PPG_Segments.xlsx')
-        PPG = obj.PPG_SEG;
+        %arr_size = size(obj.PPG_SEG);
+        %obj.PPG_SEG = resize(obj.PPG_SEG, [obj.total_seg_idx arr_size(2)]);
+        %writematrix(obj.PPG_SEG, 'PPG_Segments.xlsx')
+        %PPG = obj.PPG_SEG;
 
         %save segmented data of APG for zero padded values
-        arr_size = size(obj.APG_SEG);
-        obj.APG_SEG = resize(obj.APG_SEG, [obj.total_seg_idx arr_size(2)]);
-        writematrix(obj.APG_SEG, 'APG_Segments.xlsx')
-        APG_s = obj.APG_SEG;
+        %arr_size = size(obj.APG_SEG);
+        %obj.APG_SEG = resize(obj.APG_SEG, [obj.total_seg_idx arr_size(2)]);
+        %writematrix(obj.APG_SEG, 'APG_Segments.xlsx')
+        %APG_s = obj.APG_SEG;
 
         %save location of min and max with segment
         obj.SEG_min_max = resize(obj.SEG_min_max, [obj.total_seg_idx 3]);
-        writematrix(obj.SEG_min_max, 'ID_min1_min2.xlsx')
+        writematrix(obj.SEG_min_max, 'ID_min1_min2.xlsx', WriteMode='overwritesheet')
         SMM = obj.SEG_min_max;
 
         %save filtered data of the whole input PPG 219 x 2100
-        writematrix(obj.PPG_filtered, 'PPG_Filtered_HighSQI.xlsx')
-        PPG_fil = obj.PPG_filtered;
+        %writematrix(obj.PPG_filtered, 'PPG_Filtered_HighSQI.xlsx')
+        %PPG_fil = obj.PPG_filtered;
 
-        %save feature table
-        obj.feature = resize(obj.feature, [obj.total_seg_idx 30]);
-        writematrix(obj.feature, 'PPG_features.xlsx')
-        P_feat = obj.feature;
+        %save total feature table
+        obj.feature.total = resize(obj.feature.total, [obj.total_seg_idx 147]);
+        writematrix(obj.feature.total, 'PPG_features.xlsx', WriteMode='overwritesheet')
+        P_feat = obj.feature.total;
 
         %save c and d presence table
         obj.c_d_APG = resize(obj.c_d_APG, [obj.total_seg_idx 1]);
-        writematrix(obj.c_d_APG, 'c_d_presence.xlsx')
+        writematrix(obj.c_d_APG, 'c_d_presence.xlsx', WriteMode='overwritesheet')
         C_D = obj.c_d_APG;
 
         %save entry and segment index table
         obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.total_seg_idx 2]);
-        writematrix(obj.entry_and_seg_id, 'entry_and_seg_id.xlsx')
+        writematrix(obj.entry_and_seg_id, 'entry_and_seg_id.xlsx', WriteMode='overwritesheet')
         index = obj.entry_and_seg_id;
 
-        save 'Results30Jan' 'PPG' 'APG_s' 'SMM' 'P_feat' PPG_fil 'C_D' 'index','-mat';
+        %save 'Results30Jan' 'PPG' 'APG_s' 'SMM' 'P_feat' PPG_fil 'C_D' 'index','-mat';
+        save 'Results30Jan' 'SMM' 'P_feat' 'C_D' 'index','-mat';
     end
 
 end
@@ -639,7 +679,18 @@ methods (Access = private)
             obj.PPG_filtered = resize(obj.PPG_filtered, [obj.size_data(1) obj.size_data(2)]);
             obj.PPG_SEG = resize(obj.PPG_SEG, [obj.size_data(1) obj.size_data(2)]);
             obj.APG_SEG = resize(obj.APG_SEG, [obj.size_data(1) obj.size_data(2)]);
-            obj.feature = resize(obj.feature, [obj.size_data(1) 30]);
+
+            obj.feature = struct('total', resize(obj.feature.total, [obj.size_data(1) 147]), ...
+                                 'fiducial_value', resize(obj.feature.fiducial_value, [obj.size_data(1) 15]), ...
+                                 'fiducial_time', resize(obj.feature.fiducial_time, [obj.size_data(1) 15]), ...
+                                 'timespan', resize(obj.feature.fiducial_value, [obj.size_data(1) 23]), ...
+                                 'amplitude', resize(obj.feature.fiducial_value, [obj.size_data(1) 14]), ...
+                                 'vpg_apg', resize(obj.feature.fiducial_value, [obj.size_data(1) 12]), ...
+                                 'waveform_area', resize(obj.feature.fiducial_value, [obj.size_data(1) 4]), ...
+                                 'power_area', resize(obj.feature.fiducial_value, [obj.size_data(1) 15]), ...
+                                 'ratio', resize(obj.feature.fiducial_value, [obj.size_data(1) 33]), ...
+                                 'slope', resize(obj.feature.fiducial_value, [obj.size_data(1) 16]));
+
             obj.c_d_APG = resize(obj.c_d_APG, [obj.size_data(1) 1]);
             obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.size_data(1) 2]);
         end
@@ -719,7 +770,8 @@ methods (Access = private)
             if index_PPG_min(i+1) > index_PPG_min(i) + threshold
                 % If yes, check if there is any maximum index between the two minima
                 maxima_between_minima = index_PPG_max(index_PPG_max > index_PPG_min(i) & index_PPG_max < index_PPG_min(i+1));
-                if ~isempty(maxima_between_minima)
+                next_peak = index_PPG_max(find(index_PPG_max > index_PPG_min(i+1), 1));
+                if ~isempty(maxima_between_minima) & ~isempty(next_peak)
                     cycle_index = cycle_index + 1;
 
                     start_index(cycle_index) = index_PPG_min(i);
