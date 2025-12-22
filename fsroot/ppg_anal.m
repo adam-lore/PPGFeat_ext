@@ -124,7 +124,7 @@ methods
         if (obj.num_seg == 1)
             obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ceil(obj.size_data(2) * (RFs / OFs))); %Create matrix to store resampled PPG
         else
-            obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ceil(seg_len * (RFs / OFs))); %Create matrix to store resampled PPG
+            obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * OFs) / 1000)); %Create matrix to store resampled PPG
         end
 
         obj.SEG_min_max = zeros(obj.size_data(1) * obj.num_seg, 3); %variable to store location of min and max with data id
@@ -367,11 +367,6 @@ methods
     end
 
     function [start_idx, end_idx, corr_qulity, skew_quality, seg_quality] = FindBestCycle(obj)
-        if obj.entry_idx == 12 && obj.seg_idx == 25
-            warning('Break reached');
-        end
-
-
         [start_index, end_index, peak_index] = obj.FindCycles();
         [cycle_idx, corr_qulity, skew_quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
 
@@ -578,11 +573,11 @@ methods
         %c and d presence
         obj.c_d_APG(obj.total_seg_idx) = obj.c_d_pres;
 
-        if length(obj.PPG_filtered(obj.total_seg_idx, :)) < min2 + ceil(obj.RFs/4)
+        if length(obj.PPG_filtered(obj.total_seg_idx, :)) < min2 + ceil(obj.RFs/2)
             res = false;
         else
             %find systolic peak of next cycle
-            next_cycle_seg = obj.PPG_filtered(obj.total_seg_idx , min2:(min2 + ceil(obj.RFs/4)));
+            next_cycle_seg = obj.PPG_filtered(obj.total_seg_idx , min2:(min2 + ceil(obj.RFs/2)));
             %find maxima and minima of current segment
             next_max = islocalmax(next_cycle_seg ,"MinProminence",0.1,"FlatSelection","all",...
                 "MinSeparation", ceil(obj.RFs/5));
@@ -786,6 +781,17 @@ methods (Access = private)
 
         index_PPG_max = find(PPG_max);
         index_PPG_min = find(PPG_min);
+
+        if obj.entry_idx == 12 && obj.seg_idx == 25 && 1 == 2
+            warning('Break reached');
+            temp = plot(obj.PPG_filtered(obj.total_seg_idx ,:));
+            for i = 1:length(index_PPG_max)
+                datatip(temp, index_PPG_max(i), obj.PPG_filtered(obj.total_seg_idx , index_PPG_max(i)),'FontSize',3)
+            end
+            for i = 1:length(index_PPG_min)
+                datatip(temp, index_PPG_min(i), obj.PPG_filtered(obj.total_seg_idx , index_PPG_min(i)),'FontSize',3)
+            end
+        end
 
         % Set start, end and peak index arrays to zero of size index_PPG_min
         [start_index, end_index, peak_index] = deal(zeros(size(index_PPG_min)));
