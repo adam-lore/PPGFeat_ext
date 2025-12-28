@@ -360,9 +360,9 @@ methods
 
         segment = obj.PPG_filtered(obj.total_seg_idx ,:);
         %find maxima and minima of current segment
-        PPG_max = islocalmax(segment ,"MinProminence",0.1,"FlatSelection","all",...
+        PPG_max = islocalmax(segment ,"MinProminence",0.5,"FlatSelection","all",...
             "MinSeparation", ceil(obj.RFs/5));
-        PPG_min = islocalmin(segment ,"MinProminence",0.1,"FlatSelection","all",...
+        PPG_min = islocalmin(segment ,"MinProminence",0.5,"FlatSelection","all",...
             "MinSeparation", ceil(obj.RFs/10));
     end
 
@@ -516,17 +516,26 @@ methods
         min_index_jpg = islocalmin(obj.JPG,"MinProminence",50,"FlatSelection","all",...
             "MinSeparation",ceil(obj.RFs/20) ,"MaxNumExtrema",5);
 
-        max_value_jpg = find(max_index_jpg); %first point of jpg is not detected
-        min_value_jpg  = find(min_index_jpg);
+        index_max_jpg = find(max_index_jpg); %first point of jpg is not detected
+        index_min_jpg  = find(min_index_jpg);
         z_jpg = zerocrossing(obj.JPG);
 
         [obj.c_d_pres, c, d, e, f, dn, dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
-                                                    obj.JPG, max_value_jpg, min_value_jpg, z_apg, z_jpg, obj.T2_5, obj.RFs);
+                                                    obj.JPG, index_max_jpg, index_min_jpg, z_apg, z_jpg, obj.T2_5, obj.RFs);
 
         seg_size = size(obj.PPG_SEG);
         %store segments by zero padding remaining values
         obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];
         obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
+
+        % nomralize vpg
+        m_vpg = mean(obj.VPG);
+        st_vpg = std(obj.VPG);
+        obj.VPG = (obj.VPG - m_vpg)/st_vpg;
+        % nomralize apg
+        m_apg = mean(obj.APG);
+        st_apg = std(obj.APG);
+        obj.APG = (obj.APG - m_apg)/st_apg;
 
         if (c == 0 || d == 0 || e == 0 || f == 0 || dn == 0 || dp == 0 || ...
             onset == 0 || sp == 0 || offset == 0 | length(index_max_apg) < 1 | length(index_min_apg) < 1)
@@ -791,6 +800,7 @@ methods (Access = private)
             for i = 1:length(index_PPG_min)
                 datatip(temp, index_PPG_min(i), obj.PPG_filtered(obj.total_seg_idx , index_PPG_min(i)),'FontSize',3)
             end
+            warning('Break done');
         end
 
         % Set start, end and peak index arrays to zero of size index_PPG_min

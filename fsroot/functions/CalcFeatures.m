@@ -1,4 +1,4 @@
-function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff_time, uxvw_time, abcdef_time, ppg, vpg, apg, sample_freq)
+function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff_time, uxvw_time, abcdef_time, ppg, vpg, apg, sample_freq)%store filtered data
     [val_on, val_sp, val_dn, val_dp, val_off] = deal(OnSpDnDpOff(1), OnSpDnDpOff(2), OnSpDnDpOff(3), OnSpDnDpOff(4), OnSpDnDpOff(5));
     [val_u, val_x, val_v, val_w] = deal(uxvw(1), uxvw(2), uxvw(3), uxvw(4));
     [val_a, val_b, val_c, val_d, val_e, val_f] = deal(abcdef(1), abcdef(2), abcdef(3), abcdef(4), abcdef(5), abcdef(6));
