@@ -106,12 +106,17 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     am_on_dn = val_dn - val_on;
     am_on_dp = val_dp - val_on;
 
-    am_on_u = ppg(time_u) - val_on;
-    am_on_v = ppg(time_v) - val_on;
+    am_on_u = nanCalculate(time_u, @(arr, in) (arr(in(1)) - in(2)), ppg, [time_u val_on]);
+    %am_on_u = ppg(time_u) - val_on;
+    am_on_v = nanCalculate(time_v, @(arr, in) (arr(in(1)) - in(2)), ppg, [time_v val_on]);
+    %am_on_v = ppg(time_v) - val_on;
 
-    am_on_a = ppg(time_a) - val_on;
-    am_on_b = ppg(time_b) - val_on;
-    am_on_c = ppg(time_c) - val_on;
+    am_on_a = nanCalculate(time_a, @(arr, in) (arr(in(1)) - in(2)), ppg, [time_a val_on]);
+    %am_on_a = ppg(time_a) - val_on;
+    am_on_b = nanCalculate(time_b, @(arr, in) (arr(in(1)) - in(2)), ppg, [time_b val_on]);
+    %am_on_b = ppg(time_b) - val_on;
+    am_on_c = nanCalculate(time_c, @(arr, in) (arr(in(1)) - in(2)), ppg, [time_c val_on]);
+    %am_on_c = ppg(time_c) - val_on;
 
     am_on_off = time_off - time_on;
 
@@ -138,8 +143,11 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     feature.amplitude(13) = ar_dn_sp__on_sp;
     feature.amplitude(14) = ar_dp_sp__on_sp;
 
-    val_vpg_c = vpg(time_c);
-    val_vpg_d = vpg(time_d);
+
+    val_vpg_c = nanCalculate(time_c, @(arr, in) (arr(in(1))), vpg, time_c);
+    %val_vpg_c = vpg(time_c);
+    val_vpg_d = nanCalculate(time_d, @(arr, in) (arr(in(1))), vpg, time_d);
+    %val_vpg_d = vpg(time_d);
 
     % r means ratio
     r_w_u = val_w / val_u;
@@ -168,10 +176,14 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     feature.vpg_apg(12) = r_bcd_a;
 
     % wa means waveform area
-    wa_on_off = trapz(ppg(time_on : time_off));
-    wa_on_sp = trapz(ppg(time_on : time_sp));
-    wa_on_c = trapz(ppg(time_on : time_c));
-    wa_on_dn = trapz(ppg(time_on : time_dn));
+    wa_on_off = nanCalculate([time_on time_off], @(arr, in) (trapz(arr(in(1) : in(2)))), ppg, [time_on time_off]);
+    %wa_on_off = trapz(ppg(time_on : time_off));
+    wa_on_sp = nanCalculate([time_on time_sp], @(arr, in) (trapz(arr(in(1) : in(2)))), ppg, [time_on time_sp]);
+    %wa_on_sp = trapz(ppg(time_on : time_sp));
+    wa_on_c = nanCalculate([time_on time_c], @(arr, in) (trapz(arr(in(1) : in(2)))), ppg, [time_on time_c]);
+    %wa_on_c = trapz(ppg(time_on : time_c));
+    wa_on_dn = nanCalculate([time_on time_dn], @(arr, in) (trapz(arr(in(1) : in(2)))), ppg, [time_on time_dn]);
+    %wa_on_dn = trapz(ppg(time_on : time_dn));
 
     feature.waveform_area(1) = wa_on_off;
     feature.waveform_area(2) = wa_on_sp;
@@ -179,24 +191,39 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     feature.waveform_area(4) = wa_on_dn;
 
     % pa means power area
-    pa_on_sp_ppg = sumsqr(ppg(time_on : time_sp));
-    pa_u_sp_ppg = sumsqr(ppg(time_u : time_sp));
-    pa_sp_c_ppg = sumsqr(ppg(time_sp : time_c));
-    pa_sp_d_ppg = sumsqr(ppg(time_sp : time_d));
+    pa_on_sp_ppg = nanCalculate([time_on time_sp], @(arr, in) (sumsqr(arr(in(1) : in(2)))), ppg, [time_on time_sp]);
+    %pa_on_sp_ppg = sumsqr(ppg(time_on : time_sp));
+    pa_u_sp_ppg = nanCalculate([time_u time_sp], @(arr, in) (sumsqr(arr(in(1) : in(2)))), ppg, [time_u time_sp]);
+    %pa_u_sp_ppg = sumsqr(ppg(time_u : time_sp));
+    pa_sp_c_ppg = nanCalculate([time_sp time_c], @(arr, in) (sumsqr(arr(in(1) : in(2)))), ppg, [time_sp time_c]);
+    %pa_sp_c_ppg = sumsqr(ppg(time_sp : time_c));
+    pa_sp_d_ppg = nanCalculate([time_sp time_d], @(arr, in) (sumsqr(arr(in(1) : in(2)))), ppg, [time_sp time_d]);
+    %pa_sp_d_ppg = sumsqr(ppg(time_sp : time_d));
 
-    pa_on_sp_vpg = sumsqr(vpg(time_on : time_sp));
-    pa_u_sp_vpg = sumsqr(vpg(time_u : time_sp));
-    pa_sp_c_vpg = sumsqr(vpg(time_sp : time_c));
-    pa_sp_d_vpg = sumsqr(vpg(time_sp : time_d));
+    pa_on_sp_vpg = nanCalculate([time_on time_sp], @(arr, in) (sumsqr(arr(in(1) : in(2)))), vpg, [time_on time_sp]);
+    %pa_on_sp_vpg = sumsqr(vpg(time_on : time_sp));
+    pa_u_sp_vpg = nanCalculate([time_u time_sp], @(arr, in) (sumsqr(arr(in(1) : in(2)))), vpg, [time_u time_sp]);
+    %pa_u_sp_vpg = sumsqr(vpg(time_u : time_sp));
+    pa_sp_c_vpg = nanCalculate([time_sp time_c], @(arr, in) (sumsqr(arr(in(1) : in(2)))), vpg, [time_sp time_c]);
+    %pa_sp_c_vpg = sumsqr(vpg(time_sp : time_c));
+    pa_sp_d_vpg = nanCalculate([time_sp time_d], @(arr, in) (sumsqr(arr(in(1) : in(2)))), vpg, [time_sp time_d]);
+    %pa_sp_d_vpg = sumsqr(vpg(time_sp : time_d));
 
-    pa_on_sp_apg = sumsqr(apg(time_on : time_sp));
-    pa_u_sp_apg = sumsqr(apg(time_u : time_sp));
-    pa_sp_c_apg = sumsqr(apg(time_sp : time_c));
-    pa_sp_d_apg = sumsqr(apg(time_sp : time_d));
+    pa_on_sp_apg = nanCalculate([time_on time_sp], @(arr, in) (sumsqr(arr(in(1) : in(2)))), apg, [time_on time_sp]);
+    %pa_on_sp_apg = sumsqr(apg(time_on : time_sp));
+    pa_u_sp_apg = nanCalculate([time_u time_sp], @(arr, in) (sumsqr(arr(in(1) : in(2)))), apg, [time_u time_sp]);
+    %pa_u_sp_apg = sumsqr(apg(time_u : time_sp));
+    pa_sp_c_apg = nanCalculate([time_sp time_c], @(arr, in) (sumsqr(arr(in(1) : in(2)))), apg, [time_sp time_c]);
+    %pa_sp_c_apg = sumsqr(apg(time_sp : time_c));
+    pa_sp_d_apg = nanCalculate([time_sp time_d], @(arr, in) (sumsqr(arr(in(1) : in(2)))), apg, [time_sp time_d]);
+    %pa_sp_d_apg = sumsqr(apg(time_sp : time_d));
 
-    pa_on_off_ppg = sumsqr(ppg(time_on : time_off));
-    pa_on_off_vpg = sumsqr(vpg(time_on : time_off));
-    pa_on_off_apg = sumsqr(apg(time_on : time_off));
+    pa_on_off_ppg = nanCalculate([time_on time_off], @(arr, in) (sumsqr(arr(in(1) : in(2)))), ppg, [time_on time_off]);
+    %pa_on_off_ppg = sumsqr(ppg(time_on : time_off));
+    pa_on_off_vpg = nanCalculate([time_on time_off], @(arr, in) (sumsqr(arr(in(1) : in(2)))), vpg, [time_on time_off]);
+    %pa_on_off_vpg = sumsqr(vpg(time_on : time_off));
+    pa_on_off_apg = nanCalculate([time_on time_off], @(arr, in) (sumsqr(arr(in(1) : in(2)))), apg, [time_on time_off]);
+    %pa_on_off_apg = sumsqr(apg(time_on : time_off));
 
     feature.power_area(1) = pa_on_sp_ppg;
     feature.power_area(2) = pa_u_sp_ppg;
@@ -233,7 +260,8 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     r_am_on_v__am_on_sp = am_on_v / am_on_sp;
     r_am_on_off__am_on_sp = am_on_off / am_on_sp; 
 
-    wa_dn_off = trapz(ppg(time_dn : time_off));
+    wa_dn_off = nanCalculate([time_dn time_off], @(arr, in) (trapz(arr(in(1) : in(2)))), ppg, [time_dn time_off]);
+    %wa_dn_off = trapz(ppg(time_dn : time_off));
     r_wa_dn_off__wa_on_dn = wa_dn_off / wa_on_dn;
 
     r_sp_on = val_sp / val_on;
@@ -292,23 +320,35 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     feature.ratio(33) = r_pa_sp_d_apg__pa_on_off_apg;
 
     % s means slope
-    s_sp_c_ppg = (ppg(time_c) - val_sp) / ((time_c - time_sp) * sample_time);
-    s_sp_d_ppg = (ppg(time_d) - val_sp) / ((time_d - time_sp) * sample_time);
-    s_b_sp_ppg = (val_sp - ppg(time_b)) / ((time_sp - time_b) * sample_time);
-    s_b_c_ppg = (ppg(time_c) - ppg(time_b)) / ((time_c - time_b) * sample_time);
-    s_b_d_ppg = (ppg(time_d) - ppg(time_b)) / ((time_d - time_b) * sample_time);
-    s_u_sp_ppg = (val_sp - ppg(time_u)) / ((time_sp - time_u) * sample_time);
+
+    s_sp_c_ppg = (nanCalculate(time_c, @(arr,in) (arr(in(1))), ppg, time_c) - val_sp) / ((time_c - time_sp) * sample_time);
+    %s_sp_c_ppg = (ppg(time_c) - val_sp) / ((time_c - time_sp) * sample_time);
+    s_sp_d_ppg = (nanCalculate(time_d, @(arr,in) (arr(in(1))), ppg, time_d) - val_sp) / ((time_d - time_sp) * sample_time);
+    %s_sp_d_ppg = (ppg(time_d) - val_sp) / ((time_d - time_sp) * sample_time);
+    s_b_sp_ppg = (val_sp - nanCalculate(time_b, @(arr,in) (arr(in(1))), ppg, time_b)) / ((time_sp - time_b) * sample_time);
+    %s_b_sp_ppg = (val_sp - ppg(time_b)) / ((time_sp - time_b) * sample_time);
+    s_b_c_ppg = nanCalculate([time_c time_b], @(arr,in) (arr(in(1)) - arr(in(2))), ppg, [time_c time_b]) / ((time_c - time_b) * sample_time);
+    %s_b_c_ppg = (ppg(time_c) - ppg(time_b)) / ((time_c - time_b) * sample_time);
+    s_b_d_ppg = nanCalculate([time_d time_b], @(arr,in) (arr(in(1)) - arr(in(2))), ppg, [time_d time_b]) / ((time_d - time_b) * sample_time);
+    %s_b_d_ppg = (ppg(time_d) - ppg(time_b)) / ((time_d - time_b) * sample_time);
+    s_u_sp_ppg = (val_sp - nanCalculate(time_u, @(arr,in) (arr(in(1))), ppg, time_u)) / ((time_sp - time_u) * sample_time);
+    %s_u_sp_ppg = (val_sp - ppg(time_u)) / ((time_sp - time_u) * sample_time);
     s_on_sp_ppg = (val_sp - val_on) / ((time_sp - time_on) * sample_time);
-    s_a_b_ppg = (ppg(time_b) - ppg(time_a)) / ((time_b - time_a) * sample_time);
+    s_a_b_ppg = nanCalculate([time_b time_a], @(arr,in) (arr(in(1)) - arr(in(2))), ppg, [time_b time_a]) / ((time_b - time_a) * sample_time);
+    %s_a_b_ppg = (ppg(time_b) - ppg(time_a)) / ((time_b - time_a) * sample_time);
     
     s_a_b_apg = (val_b - val_a) / ((time_b - time_a) * sample_time);
-    s_b_sp_apg = (apg(time_sp) - val_b) / ((time_sp - time_b) * sample_time);
+    s_b_sp_apg = (nanCalculate(time_sp, @(arr,in) (arr(in(1))), apg, time_sp) - val_b) / ((time_sp - time_b) * sample_time);
+    %s_b_sp_apg = (apg(time_sp) - val_b) / ((time_sp - time_b) * sample_time);
     s_b_c_apg = (val_c - val_b) / ((time_c - time_b) * sample_time);
     s_b_d_apg = (val_d - val_b) / ((time_d - time_b) * sample_time);
     s_b_e_apg = (val_e - val_b) / ((time_e - time_b) * sample_time);
-    s_sp_c_apg = (val_c - apg(time_sp)) / ((time_c - time_sp) * sample_time);
-    s_u_sp_apg = (apg(time_sp) - apg(time_u)) / ((time_sp - time_u) * sample_time);
-    s_on_sp_apg = (apg(time_sp) - apg(time_on)) / ((time_sp - time_on) * sample_time);
+    s_sp_c_apg = (val_c - nanCalculate(time_sp, @(arr,in) (arr(in(1))), apg, time_sp)) / ((time_c - time_sp) * sample_time);
+    %s_sp_c_apg = (val_c - apg(time_sp)) / ((time_c - time_sp) * sample_time);
+    s_u_sp_apg = nanCalculate([time_sp time_u], @(arr,in) (arr(in(1)) - arr(in(2))), apg, [time_sp time_u]) / ((time_sp - time_u) * sample_time);
+    %s_u_sp_apg = (apg(time_sp) - apg(time_u)) / ((time_sp - time_u) * sample_time);
+    s_on_sp_apg = nanCalculate([time_sp time_on], @(arr,in) (arr(in(1)) - arr(in(2))), apg, [time_sp time_on]) / ((time_sp - time_on) * sample_time);
+    %s_on_sp_apg = (apg(time_sp) - apg(time_on)) / ((time_sp - time_on) * sample_time);
 
     feature.slope(1) = s_sp_c_ppg;
     feature.slope(2) = s_sp_d_ppg;
@@ -330,4 +370,15 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     feature.total = [feature.fiducial_value feature.fiducial_time feature.timespan ...
                      feature.amplitude feature.vpg_apg feature.waveform_area ...
                      feature.power_area feature.ratio feature.slope];
+end
+
+% calculates function if all variables in check are not NaN, otherwise returns NaN
+function out = nanCalculate(check, func, arr, inputs)
+    for i = 1:length(check)
+        if isnan(check(i))
+            out = NaN;
+            return
+        end
+    end
+    out = func(arr, inputs);
 end

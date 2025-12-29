@@ -127,6 +127,10 @@ methods
             obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * OFs) / 1000)); %Create matrix to store resampled PPG
         end
 
+        total_seg = obj.size_data(1) * obj.num_seg;
+
+        obj.entry_and_seg_id = zeros(total_seg, 2);
+
         obj.SEG_min_max = zeros(obj.size_data(1) * obj.num_seg, 3); %variable to store location of min and max with data id
         filtered = zeros(obj.size_data); %Create matrix to store filtered PPG 
         
@@ -196,19 +200,16 @@ methods
         end
 
         %initialize the variables
-        obj.OnSpDnDpOff = zeros(1,4);
-        obj.uxvw = zeros(1,4);
-        obj.abcdef = zeros(1,5);
+        obj.OnSpDnDpOff = NaN(1,4);
+        obj.uxvw = NaN(1,4);
+        obj.abcdef = NaN(1,5);
 
-        total_seg = obj.size_data(1) * obj.num_seg;
-
-        obj.feature = struct('total', zeros(total_seg,147), 'fiducial_value', zeros(total_seg,15), 'fiducial_time', zeros(total_seg,15), ...
-                                'timespan', zeros(total_seg,23), 'amplitude', zeros(total_seg,14), ...
-                                'vpg_apg', zeros(total_seg,12), 'waveform_area', zeros(total_seg,4), ...
-                                'power_area', zeros(total_seg,15), 'ratio', zeros(total_seg,33), 'slope', zeros(total_seg,16));
+        obj.feature = struct('total', NaN(total_seg,147), 'fiducial_value', NaN(total_seg,15), 'fiducial_time', NaN(total_seg,15), ...
+                                'timespan', NaN(total_seg,23), 'amplitude', NaN(total_seg,14), ...
+                                'vpg_apg', NaN(total_seg,12), 'waveform_area', NaN(total_seg,4), ...
+                                'power_area', NaN(total_seg,15), 'ratio', NaN(total_seg,33), 'slope', NaN(total_seg,16));
 
         obj.c_d_APG = zeros(total_seg, 1);
-        obj.entry_and_seg_id = zeros(total_seg, 2);
 
         % Create empty Ssqi values
         A = ones(obj.size_data(1),1);
@@ -299,14 +300,14 @@ methods
         obj.APG_SEG = obj.PPG_filtered;
 
         %initialize the variables
-        obj.OnSpDnDpOff = zeros(1,4);
-        obj.uxvw = zeros(1,4);
-        obj.abcdef = zeros(1,5);
+        obj.OnSpDnDpOff = NaN(1,4);
+        obj.uxvw = NaN(1,4);
+        obj.abcdef = NaN(1,5);
 
-        obj.feature = struct('total', zeros(obj.size_data(1),147), 'fiducial_value', zeros(obj.size_data(1),15), 'fiducial_time', zeros(obj.size_data(1),15), ...
-                                'timespan', zeros(obj.size_data(1),23), 'amplitude', zeros(obj.size_data(1),14), ...
-                                'vpg_apg', zeros(obj.size_data(1),12), 'waveform_area', zeros(obj.size_data(1),4), ...
-                                'power_area', zeros(obj.size_data(1),15), 'ratio', zeros(obj.size_data(1),33), 'slope', zeros(obj.size_data(1),16));
+        obj.feature = struct('total', NaN(obj.size_data(1),147), 'fiducial_value', NaN(obj.size_data(1),15), 'fiducial_time', NaN(obj.size_data(1),15), ...
+                                'timespan', NaN(obj.size_data(1),23), 'amplitude', NaN(obj.size_data(1),14), ...
+                                'vpg_apg', NaN(obj.size_data(1),12), 'waveform_area', NaN(obj.size_data(1),4), ...
+                                'power_area', NaN(obj.size_data(1),15), 'ratio', NaN(obj.size_data(1),33), 'slope', NaN(obj.size_data(1),16));
         
         obj.c_d_APG = zeros(obj.size_data(1), 1);
         obj.entry_and_seg_id = zeros(obj.size_data(1), 2);
@@ -499,9 +500,9 @@ methods
 
         if length(index_min) < 1 || length(index_max) < 1
             warning('Cannot calculate PPG');
-            onset = 0;
-            sp = 0;
-            offset = 0;
+            onset = NaN;
+            sp = NaN;
+            offset = NaN;
         else
             %read all the feature points from PPG VPG and APG
             onset = index_min(1);
@@ -537,20 +538,19 @@ methods
         st_apg = std(obj.APG);
         obj.APG = (obj.APG - m_apg)/st_apg;
 
-        if (c == 0 || d == 0 || e == 0 || f == 0 || dn == 0 || dp == 0 || ...
-            onset == 0 || sp == 0 || offset == 0 | length(index_max_apg) < 1 | length(index_min_apg) < 1)
+        if (any(isnan([c, d, e, f, dn, dp, onset, sp, offset])) | length(index_max_apg) < 1 | length(index_min_apg) < 1)
             warning('Cannot calculate PPG and APG fiducial points');
             res = false;
 
-            if onset == 0 || sp == 0 || offset == 0
-                obj.OnSpDnDpOff = [0 0 0 0 0];
+            if any(isnan([onset, sp, offset]))
+                obj.OnSpDnDpOff = [NaN NaN NaN NaN NaN];
             else
-                obj.OnSpDnDpOff = [obj.seg(onset) obj.seg(sp) 0 0 obj.seg(offset)];
+                obj.OnSpDnDpOff = [obj.seg(onset) obj.seg(sp) NaN NaN obj.seg(offset)];
             end
 
-            a = 0;
-            b = 0;
-            obj.abcdef = [0 0 0 0 0 0];
+            a = NaN;
+            b = NaN;
+            obj.abcdef = [NaN NaN NaN NaN NaN NaN];
         else
             obj.OnSpDnDpOff = [obj.seg(onset) obj.seg(sp) obj.seg(dn) obj.seg(dp) obj.seg(offset)];
             a = index_max_apg(1);
@@ -561,11 +561,11 @@ methods
         if (size(index_max_vpg) < 2 | size(index_max) < 1 | size(index_min_vpg) < 1)
             warning('Cannot calculate VPG fiducial points');
             res = false;
-            u = 0;
-            x = 0;
-            v = 0;
-            w = 0;
-            obj.uxvw = [0 0 0 0];
+            u = NaN;
+            x = NaN;
+            v = NaN;
+            w = NaN;
+            obj.uxvw = [NaN NaN NaN NaN];
         else
             u = index_max_vpg(1);
             x = index_max(1);
@@ -591,13 +591,13 @@ methods
             next_max = islocalmax(next_cycle_seg ,"MinProminence",0.1,"FlatSelection","all",...
                 "MinSeparation", ceil(obj.RFs/5));
             obj.next_peak = find(next_max, 1) + min2;
-            if isempty(obj.next_peak)
+            if ~isempty(obj.next_peak)
+                UpdateFeatures(obj);
+            else
                 res = false;
             end
         end
-        if res == true
-            UpdateFeatures(obj);
-        end
+        
     end
 
     function GenerateOutput(obj)
@@ -717,16 +717,31 @@ methods (Access = private)
             obj.PPG_SEG = resize(obj.PPG_SEG, [obj.size_data(1) obj.size_data(2)]);
             obj.APG_SEG = resize(obj.APG_SEG, [obj.size_data(1) obj.size_data(2)]);
 
-            obj.feature = struct('total', resize(obj.feature.total, [obj.size_data(1) 147]), ...
-                                 'fiducial_value', resize(obj.feature.fiducial_value, [obj.size_data(1) 15]), ...
-                                 'fiducial_time', resize(obj.feature.fiducial_time, [obj.size_data(1) 15]), ...
-                                 'timespan', resize(obj.feature.fiducial_value, [obj.size_data(1) 23]), ...
-                                 'amplitude', resize(obj.feature.fiducial_value, [obj.size_data(1) 14]), ...
-                                 'vpg_apg', resize(obj.feature.fiducial_value, [obj.size_data(1) 12]), ...
-                                 'waveform_area', resize(obj.feature.fiducial_value, [obj.size_data(1) 4]), ...
-                                 'power_area', resize(obj.feature.fiducial_value, [obj.size_data(1) 15]), ...
-                                 'ratio', resize(obj.feature.fiducial_value, [obj.size_data(1) 33]), ...
-                                 'slope', resize(obj.feature.fiducial_value, [obj.size_data(1) 16]));
+            old_feature = obj.feature;
+
+            old_size = size(obj.feature.total);
+
+            obj.feature.total = NaN(obj.size_data(1), 147);
+            obj.feature.fiducial_value = NaN(obj.size_data(1), 15);
+            obj.feature.fiducial_time = NaN(obj.size_data(1), 15);
+            obj.feature.timespan = NaN(obj.size_data(1), 23);
+            obj.feature.amplitude = NaN(obj.size_data(1), 14);
+            obj.feature.vpg_apg = NaN(obj.size_data(1), 12);
+            obj.feature.waveform_area = NaN(obj.size_data(1), 4);
+            obj.feature.power_area = NaN(obj.size_data(1), 15);
+            obj.feature.ratio = NaN(obj.size_data(1), 33);
+            obj.feature.slope = NaN(obj.size_data(1), 16);
+
+            obj.feature.total(1:old_size(1), :) = old_feature.total;
+            obj.feature.fiducial_value(1:old_size(1), :) = old_feature.fiducial_value;
+            obj.feature.fiducial_time(1:old_size(1), :) = old_feature.fiducial_time;
+            obj.feature.timespan(1:old_size(1), :) = old_feature.timespan;
+            obj.feature.amplitude(1:old_size(1), :) = old_feature.amplitude;
+            obj.feature.vpg_apg(1:old_size(1), :) = old_feature.vpg_apg;
+            obj.feature.waveform_area(1:old_size(1), :) = old_feature.waveform_area;
+            obj.feature.power_area(1:old_size(1), :) = old_feature.power_area;
+            obj.feature.ratio(1:old_size(1), :) = old_feature.ratio;
+            obj.feature.slope(1:old_size(1), :) = old_feature.slope;
 
             obj.c_d_APG = resize(obj.c_d_APG, [obj.size_data(1) 1]);
             obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.size_data(1) 2]);

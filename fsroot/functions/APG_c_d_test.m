@@ -4,7 +4,7 @@ function [c_d_presence, c, d, e, f, N, D] = ...
 
 % Initialize all outputs
 c_d_presence = 1;
-[c, d, e, f, N, D] = deal(0);
+[c, d, e, f, N, D] = deal(NaN);
 
 
 % Ensure sufficient indices

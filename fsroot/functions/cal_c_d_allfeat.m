@@ -2,7 +2,7 @@ function [N, D, c, d,e, f ] = ...
           cal_c_d_allfeat(minapg, maxapg, minjpg, maxjpg, z_apg, z_jpg, Jpg, T2_5)
     %disp("cal_c_d_allfeat is running now");
     % Initialize outputs
-    [N, D, c, d, e, f] = deal(0);
+    [N, D, c, d, e, f] = deal(NaN);
     
 
     if length(maxapg) < 2 || length(minjpg) < 2
