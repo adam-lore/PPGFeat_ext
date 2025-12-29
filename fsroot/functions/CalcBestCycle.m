@@ -15,15 +15,20 @@ function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_
     mean_cycle = 0;
 
     if num_cycle > 2
-        % Calculate the mean beat-to-beat interval
-        mean_interval = ceil((peak_index(num_cycle) - peak_index(1)) / (num_cycle - 1));
-
-        centered_cycles = zeros(num_cycle, mean_interval);
+        % Calculate the median beat-to-beat interval
+        if (~mod(num_cycle,2))
+            median_interval = ceil(peak_index(floor(num_cycle / 2) + 1) - peak_index(floor(num_cycle / 2)));
+        else
+            median = ceil(num_cycle / 2);
+            median_interval = ceil(((peak_index(median) - peak_index(median - 1)) + ...
+                                    (peak_index(median + 1) - peak_index(median))) / 2);
+        end
+        centered_cycles = zeros(num_cycle, median_interval);
 
         for i = 1:length(start_index)
             % Center cycle to peak with length of mean interval
-            i1 = peak_index(i) - ceil(mean_interval / 2);
-            i2 = peak_index(i) + floor(mean_interval / 2) - 1;
+            i1 = peak_index(i) - ceil(median_interval / 2);
+            i2 = peak_index(i) + floor(median_interval / 2) - 1;
 
             % See of centered cycle fits in segment
             if i1 < 1
@@ -77,7 +82,7 @@ function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_
 
         if (corr_quality * (skew_quality / 2)) > quality
             index = i;
-            quality = (corr_quality * skew_quality / 2);
+            quality = (corr_quality * (skew_quality / 2));
             max_corr_quality = corr_quality;
             max_skew_quality = skew_quality;
         end
