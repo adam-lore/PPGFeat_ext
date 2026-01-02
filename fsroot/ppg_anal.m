@@ -81,7 +81,7 @@ methods
         obj.seg_len = seg_len;
 
         %REMEMBER TO CHANGE
-        [file, path]= uigetfile({'*.txt';'*.csv;*.xlsx';'*.mat'}, 'Load PPG File', 'D:\Research\Examensarbete\Datasets\');  %read CVS file
+        [file, path]= uigetfile({'*.*';'*.txt';'*.csv;*.xlsx';'*.mat'}, 'Load PPG File', 'D:\Research\Examensarbete\Datasets\');  %read CVS file
         if (path == 0)
             res = false;
             return
@@ -90,29 +90,76 @@ methods
         [~, ~, file_extension] = fileparts(file);
         %load all RAW data depending on file format
         switch file_extension
-            case {'.txt' , '.csv', '.xlsx'}
+            case '.txt' 
                 obj.loaded_data = importdata([path file]); 
-            case '.mat'
-                mat_var_arr = who('-file', [path file]);
-
-                if (size(mat_var_arr) == 1)
-                    mat_var = mat_var_arr{1};
+            case {'.csv', '.xlsx'}
+                loaded_file = importdata([path file]);
+                if ~isa(loaded_file, 'struct')
+                    obj.loaded_data = loaded_file;
                 else
-                    [var_idx, tf] = listdlg('SelectionMode', 'single', 'ListString', mat_var_arr);
-                    if (tf == false)
-                        res = false;
-                        return
+                    obj.loaded_data = loaded_file.data;
+
+                    obj.size_data = size(obj.loaded_data); %read size of loaded data
+
+                    % The data may be orientated differently when there is only one entry
+                    % (And anyone who organized each entry by column is crazy)
+                    if obj.size_data(1) > obj.size_data(2)
+                        col_arr = loaded_file.colheaders;
+                        if (size(col_arr) == 1)
+                            ppg_col = 1;
+                        else
+                            [ppg_col, tf] = listdlg('PromptString', {'Select column'}, 'SelectionMode','single', 'ListString', col_arr);
+                            if (tf == false)
+                                res = false;
+                                return
+                            end
+                        end
+                        obj.loaded_data = rot90(obj.loaded_data(:, ppg_col), 3);
                     end
-                    mat_var = mat_var_arr{var_idx};
                 end
-                loaded_struct = load([path file], mat_var);
-                obj.loaded_data = loaded_struct.(mat_var);
+            case '.mat'
+                loaded_struct = importdata([path file]);
+
+                % Get field containing the data
+                [field, res] = SelectField(loaded_struct);
+                if res == false
+                    return
+                elseif isempty(field)
+                    obj.loaded_data = loaded_struct;
+                else
+                    obj.loaded_data = getfield(loaded_struct, field{:});
+                end
+
+                % Find field containing the data if each entry is a struct
+                [entry_field, res] = SelectField(obj.loaded_data(1));
+                if res == false
+                    return
+                elseif ~isempty(entry_field)
+                    obj.loaded_data = ExtractDotPath(obj.loaded_data, entry_field);
+                end
+                obj.loaded_data = rot90(obj.loaded_data, 3);
             otherwise
                 res = false;
                 return
         end
 
         obj.size_data = size(obj.loaded_data); %read size of loaded data
+
+        % The data may be orientated differently when there is only one entry
+        % (And anyone who organized each entry by column is crazy)
+        if obj.size_data(1) > obj.size_data(2)
+            obj.loaded_data = rot90(obj.loaded_data, 3);
+
+            [row_num, tf] = listdlg('PromptString', {'Select the column with PPG data'}, ...
+                                        'SelectionMode', 'single', 'ListString', string(1:obj.size_data(2)));
+            if (tf == false)
+                res = false;
+                return
+            end
+            obj.loaded_data = obj.loaded_data(row_num, :);
+            obj.size_data = size(obj.loaded_data);
+        end
+
         obj.num_entries = obj.size_data(1);
 
         if (is_seg)
@@ -526,8 +573,8 @@ methods
 
         seg_size = size(obj.PPG_SEG);
         %store segments by zero padding remaining values
-        obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];
-        obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
+        %obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];
+        %obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
 
         % nomralize vpg
         m_vpg = mean(obj.VPG);
@@ -583,21 +630,20 @@ methods
         obj.c_d_APG(obj.total_seg_idx) = obj.c_d_pres;
 
         if length(obj.PPG_filtered(obj.total_seg_idx, :)) < min2 + ceil(obj.RFs/2)
-            res = false;
+            next_cycle_seg = obj.PPG_filtered(obj.total_seg_idx , min2:end);
         else
-            %find systolic peak of next cycle
             next_cycle_seg = obj.PPG_filtered(obj.total_seg_idx , min2:(min2 + ceil(obj.RFs/2)));
-            %find maxima and minima of current segment
-            next_max = islocalmax(next_cycle_seg ,"MinProminence",0.1,"FlatSelection","all",...
-                "MinSeparation", ceil(obj.RFs/5));
-            obj.next_peak = find(next_max, 1) + min2;
-            if ~isempty(obj.next_peak)
-                UpdateFeatures(obj);
-            else
-                res = false;
-            end
         end
-        
+        %find systolic peak of next cycle
+        %find maxima and minima of current segment
+        next_max = islocalmax(next_cycle_seg ,"MinProminence",0.1,"FlatSelection","all",...
+            "MinSeparation", ceil(obj.RFs/5));
+        obj.next_peak = find(next_max, 1) + min2;
+        if ~isempty(obj.next_peak)
+            UpdateFeatures(obj);
+        else
+            res = false;
+        end    
     end
 
     function GenerateOutput(obj)
@@ -627,7 +673,32 @@ methods
 
         %save total feature table
         obj.feature.total = resize(obj.feature.total, [obj.total_seg_idx 147]);
-        writematrix(obj.feature.total, 'PPG_features.xlsx', WriteMode='overwritesheet')
+        %feature_table = array2table(obj.feature.total, 'VariableNames', {'val_on', 'val_sp', 'val_dn', 'val_dp', 'val_off', 'val_u', 'val_x', 'val_v', 'val_w', 'val_a', 'val_b', 'val_c', 'val_d', 'val_e', 'val_f', 'time_on', 'time_sp', 'time_dn', 'time_dp', 'time_off', 'time_u', 'time_x', 'time_v', 'time_w', 'time_a', 'time_b', 'time_c', 'time_d', 'time_e', 'time_f', 'ts_on_sp', 'ts_on_dn', 'ts_on_dp', 'ts_on_u', 'ts_on_v', 'ts_on_a', 'ts_on_b', 'ts_on_c', 'ts_u_next_u', 'ts_sp_c', 'ts_sp_d', 'ts_sp_e', 'ts_sp_dp', 'ts_dn_dp', 'Tm_bb2', 'ts_b_c', 'ts_b_d', 'ts_u_sp', 'ts_u_w', 'ts_u_b', 'ts_u_c', 'ts_u_d', 'ts_a_c', 'am_on_sp', 'am_on_dn', 'am_on_dp', 'am_on_u', 'am_on_v', 'am_on_a', 'am_on_b', 'am_on_c', 'am_on_off', 'am_dn_sp', 'ar_on_dn__on_sp', 'ar_on_dp__on_sp', 'ar_dn_sp__on_sp', 'ar_dp_sp__on_sp', 'val_vpg_c', 'val_vpg_d', 'r_w_u', 'r_v_u', 'r_val_vpg_c__u', 'r_val_vpg_d__u', 'r_b_a', 'r_c_a', 'r_d_a', 'r_e_a', 'r_bcde_a', 'r_bcd_a', 'wa_on_off', 'wa_on_sp', 'wa_on_c', 'wa_on_dn', 'pa_on_sp_ppg', 'pa_u_sp_ppg', 'pa_sp_c_ppg', 'pa_sp_d_ppg', 'pa_on_sp_vpg', 'pa_u_sp_vpg', 'pa_sp_c_vpg', 'pa_sp_d_vpg', 'pa_on_sp_apg', 'pa_u_sp_apg', 'pa_sp_c_apg', 'pa_sp_d_apg', 'pa_on_off_ppg', 'pa_on_off_vpg', 'pa_on_off_apg', 'r_ts_on_a__ts_u_next_u', 'r_ts_on_u__ts_u_next_u', 'r_ts_on_b__ts_u_next_u', 'r_ts_on_sp__ts_u_next_u', 'r_ts_on_c__ts_u_next_u', 'r_ts_on_v__ts_u_next_u', 'r_ts_on_dn__ts_u_next_u', 'r_ts_u_w__ts_u_next_u', 'r_ts_sp_dp__ts_u_next_u', 'r_Tm_bb2_Tss', 'r_am_on_a__am_on_sp', 'r_am_on_u__am_on_sp', 'r_am_on_b__am_on_sp', 'r_am_on_c__am_on_sp', 'r_am_on_v__am_on_sp', 'r_am_on_off__am_on_sp', 'r_wa_dn_off__wa_on_dn', 'r_sp_on', 'r_wa_on_sp__wa_on_off', 'r_wa_on_c__wa_on_off', 'r_wa_on_dn__wa_on_off', 'r_pa_on_sp_ppg__pa_on_off_ppg', 'r_pa_u_sp_ppg__pa_on_off_ppg', 'r_pa_sp_c_ppg__pa_on_off_ppg', 'r_pa_sp_d_ppg__pa_on_off_ppg', 'r_pa_on_sp_vpg__pa_on_off_vpg', 'r_pa_u_sp_vpg__pa_on_off_vpg', 'r_pa_sp_c_vpg__pa_on_off_vpg', 'r_pa_sp_d_vpg__pa_on_off_vpg', 'r_pa_on_sp_apg__pa_on_off_apg', 'r_pa_u_sp_apg__pa_on_off_apg', 'r_pa_sp_c_apg__pa_on_off_apg', 'r_pa_sp_d_apg__pa_on_off_apg', 's_sp_c_ppg', 's_sp_d_ppg', 's_b_sp_ppg', 's_b_c_ppg', 's_b_d_ppg', 's_u_sp_ppg', 's_on_sp_ppg', 's_a_b_ppg', 's_a_b_apg', 's_b_sp_apg', 's_b_c_apg', 's_b_d_apg', 's_b_e_apg', 's_sp_c_apg', 's_u_sp_apg', 's_on_sp_apg'});
+        feature_table = array2table(obj.feature.total, 'VariableNames', {'val_on', 'val_sp', 'val_dn', 'val_dp', 'val_off', 'val_u', ...
+                         'val_x', 'val_v', 'val_w', 'val_a', 'val_b', 'val_c', 'val_d', 'val_e', 'val_f', 'time_on', ...
+                         'time_sp', 'time_dn', 'time_dp', 'time_off', 'time_u', 'time_x', 'time_v', 'time_w', 'time_a', ...
+                         'time_b', 'time_c', 'time_d', 'time_e', 'time_f', 'ts_on_sp', 'ts_on_dn', 'ts_on_dp', 'ts_on_u', ...
+                         'ts_on_v', 'ts_on_a', 'ts_on_b', 'ts_on_c', 'ts_u_next_u', 'ts_sp_c', 'ts_sp_d', 'ts_sp_e', 'ts_sp_dp', ...
+                         'ts_dn_dp', 'Tm_bb2', 'ts_b_c', 'ts_b_d', 'ts_u_sp', 'ts_u_w', 'ts_u_b', 'ts_u_c', 'ts_u_d', 'ts_a_c', ...
+                         'am_on_sp', 'am_on_dn', 'am_on_dp', 'am_on_u', 'am_on_v', 'am_on_a', 'am_on_b', 'am_on_c', 'am_on_off', ...
+                         'am_dn_sp', 'ar_on_dn__on_sp', 'ar_on_dp__on_sp', 'ar_dn_sp__on_sp', 'ar_dp_sp__on_sp', 'val_vpg_c', ...
+                         'val_vpg_d', 'r_w_u', 'r_v_u', 'r_val_vpg_c__u', 'r_val_vpg_d__u', 'r_b_a', 'r_c_a', 'r_d_a', 'r_e_a', ...
+                         'r_bcde_a', 'r_bcd_a', 'wa_on_off', 'wa_on_sp', 'wa_on_c', 'wa_on_dn', 'pa_on_sp_ppg', 'pa_u_sp_ppg', ...
+                         'pa_sp_c_ppg', 'pa_sp_d_ppg', 'pa_on_sp_vpg', 'pa_u_sp_vpg', 'pa_sp_c_vpg', 'pa_sp_d_vpg', 'pa_on_sp_apg', ...
+                         'pa_u_sp_apg', 'pa_sp_c_apg', 'pa_sp_d_apg', 'pa_on_off_ppg', 'pa_on_off_vpg', 'pa_on_off_apg', ...
+                         'r_ts_on_a__ts_u_next_u', 'r_ts_on_u__ts_u_next_u', 'r_ts_on_b__ts_u_next_u', 'r_ts_on_sp__ts_u_next_u', ...
+                         'r_ts_on_c__ts_u_next_u', 'r_ts_on_v__ts_u_next_u', 'r_ts_on_dn__ts_u_next_u', 'r_ts_u_w__ts_u_next_u', ...
+                         'r_ts_sp_dp__ts_u_next_u', 'r_Tm_bb2_Tss', 'r_am_on_a__am_on_sp', 'r_am_on_u__am_on_sp', ...
+                         'r_am_on_b__am_on_sp', 'r_am_on_c__am_on_sp', 'r_am_on_v__am_on_sp', 'r_am_on_off__am_on_sp', ...
+                         'r_wa_dn_off__wa_on_dn', 'r_sp_on', 'r_wa_on_sp__wa_on_off', 'r_wa_on_c__wa_on_off', 'r_wa_on_dn__wa_on_off', ...
+                         'r_pa_on_sp_ppg__pa_on_off_ppg', 'r_pa_u_sp_ppg__pa_on_off_ppg', 'r_pa_sp_c_ppg__pa_on_off_ppg', ...
+                         'r_pa_sp_d_ppg__pa_on_off_ppg', 'r_pa_on_sp_vpg__pa_on_off_vpg', 'r_pa_u_sp_vpg__pa_on_off_vpg', ...
+                         'r_pa_sp_c_vpg__pa_on_off_vpg', 'r_pa_sp_d_vpg__pa_on_off_vpg', 'r_pa_on_sp_apg__pa_on_off_apg', ...
+                         'r_pa_u_sp_apg__pa_on_off_apg', 'r_pa_sp_c_apg__pa_on_off_apg', 'r_pa_sp_d_apg__pa_on_off_apg', ...
+                         's_sp_c_ppg', 's_sp_d_ppg', 's_b_sp_ppg', 's_b_c_ppg', 's_b_d_ppg', 's_u_sp_ppg', 's_on_sp_ppg', ...
+                         's_a_b_ppg', 's_a_b_apg', 's_b_sp_apg', 's_b_c_apg', 's_b_d_apg', 's_b_e_apg', 's_sp_c_apg', ...
+                         's_u_sp_apg', 's_on_sp_apg'});
+        writetable(feature_table, 'PPG_features.xlsx', WriteMode='overwritesheet')
         P_feat = obj.feature.total;
 
         %save c and d presence table
@@ -652,6 +723,10 @@ methods
         while working
             waitbar(obj.entry_idx/obj.num_entries, progress, ...
                     sprintf('Entry: %d/%d Segment: %d', obj.entry_idx, obj.num_entries, obj.seg_idx))
+
+            if (obj.entry_idx == 105 && obj.seg_idx == 21)
+                warning("breakpoint");
+            end
             [min1, min2] = obj.FindBestCycle();
             obj.CalculateFiducial(min1, min2);
             working = obj.Next();
@@ -676,17 +751,17 @@ methods (Access = private)
                 obj.loaded_data = obj.loaded_data.(mat_var);
 
                 if (isa(obj.loaded_data, 'timeseries'))
-                    obj.loaded_data = rot90(obj.loaded_data.Data);
+                    obj.loaded_data = rot90(obj.loaded_data.Data, 3);
                 else
-                    obj.loaded_data = rot90(obj.loaded_data);
+                    obj.loaded_data = rot90(obj.loaded_data, 3);
                 end
 
             else
-                obj.loaded_data = rot90(obj.loaded_data.data(:, obj.data_col));
+                obj.loaded_data = rot90(obj.loaded_data.data(:, obj.data_col), 3);
             end
         else
             if (~strcmp(obj.dir_ext, '.txt'))
-                obj.loaded_data = rot90(obj.loaded_data);
+                obj.loaded_data = rot90(obj.loaded_data, 3);
             end
         end
 

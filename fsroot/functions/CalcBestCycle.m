@@ -32,14 +32,14 @@ function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_
 
             % See of centered cycle fits in segment
             if i1 < 1
-                start_buffer = start_buffer + 1;
+                start_buffer = 1;
                 % Remove first column
                 centered_cycles(1,:) = [];
                 num_cycle = num_cycle - 1;
                 continue;
             end
             if i2 > seg_len
-                end_buffer = end_buffer + 1;
+                end_buffer = 1;
                 % Remove last column
                 centered_cycles(num_cycle - start_buffer,:) = [];
                 num_cycle = num_cycle - 1;
