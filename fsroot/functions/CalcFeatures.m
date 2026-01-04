@@ -9,7 +9,7 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     [time_a, time_b, time_c, time_d, time_e, time_f] ...
      = deal(abcdef_time(1), abcdef_time(2), abcdef_time(3), abcdef_time(4), abcdef_time(5), abcdef_time(6));
 
-    sample_time = sample_freq/1000;
+    sample_time = 1000/sample_freq;
 
     feature.fiducial_value(1) = val_on;
     feature.fiducial_value(2) = val_sp;
@@ -27,21 +27,21 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     feature.fiducial_value(14) = val_e;
     feature.fiducial_value(15) = val_f;
 
-    feature.fiducial_time(1) = time_on;
-    feature.fiducial_time(2) = time_sp;
-    feature.fiducial_time(3) = time_dn;
-    feature.fiducial_time(4) = time_dp;
-    feature.fiducial_time(5) = time_off;
-    feature.fiducial_time(6) = time_u;
-    feature.fiducial_time(7) = time_x;
-    feature.fiducial_time(8) = time_v;
-    feature.fiducial_time(9) = time_w;
-    feature.fiducial_time(10) = time_a;
-    feature.fiducial_time(11) = time_b;
-    feature.fiducial_time(12) = time_c;
-    feature.fiducial_time(13) = time_d;
-    feature.fiducial_time(14) = time_e;
-    feature.fiducial_time(15) = time_f;
+    feature.fiducial_time(1) = time_on * sample_time;
+    feature.fiducial_time(2) = time_sp * sample_time;
+    feature.fiducial_time(3) = time_dn * sample_time;
+    feature.fiducial_time(4) = time_dp * sample_time;
+    feature.fiducial_time(5) = time_off * sample_time;
+    feature.fiducial_time(6) = time_u * sample_time;
+    feature.fiducial_time(7) = time_x * sample_time;
+    feature.fiducial_time(8) = time_v * sample_time;
+    feature.fiducial_time(9) = time_w * sample_time;
+    feature.fiducial_time(10) = time_a * sample_time;
+    feature.fiducial_time(11) = time_b * sample_time;
+    feature.fiducial_time(12) = time_c * sample_time;
+    feature.fiducial_time(13) = time_d * sample_time;
+    feature.fiducial_time(14) = time_e * sample_time;
+    feature.fiducial_time(15) = time_f * sample_time;
     
     % ts means time span
     ts_on_sp = (time_sp - time_on) * sample_time;
