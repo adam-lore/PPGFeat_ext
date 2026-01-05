@@ -171,14 +171,14 @@ methods
         if (obj.num_seg == 1)
             obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ceil(obj.size_data(2) * (RFs / OFs))); %Create matrix to store resampled PPG
         else
-            obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * OFs) / 1000)); %Create matrix to store resampled PPG
+            obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * RFs) / 1000)); %Create matrix to store resampled PPG
         end
 
         total_seg = obj.size_data(1) * obj.num_seg;
 
         obj.entry_and_seg_id = zeros(total_seg, 2);
 
-        obj.SEG_min_max = zeros(obj.size_data(1) * obj.num_seg, 3); %variable to store location of min and max with data id
+        obj.SEG_min_max = zeros(obj.size_data(1) * obj.num_seg, 2); %variable to store location of min and max with data id
         filtered = zeros(obj.size_data); %Create matrix to store filtered PPG 
         
         
@@ -209,6 +209,7 @@ methods
             if (obj.num_seg == 1)
                 for i = 1:obj.size_data(1)
                     obj.PPG_filtered(i, :) = resample(filtered(i, :), RFs, OFs);
+                    obj.entry_and_seg_id(i, :) = [i 1];
                 end
             else    
                 num_per_seg = ceil(seg_len * RFs / 1000); %how many points per segment
@@ -228,6 +229,7 @@ methods
         else
             if (obj.num_seg == 1)
                 obj.PPG_filtered = filtered;
+                obj.entry_and_seg_id = [(1:obj.size_data(1))', ones(obj.size_data(1),1)];
             else
                 num_per_seg = ceil((seg_len * OFs) / 1000); %how many points per segment
 
@@ -333,7 +335,7 @@ methods
             return
         end
 
-        obj.SEG_min_max = zeros(obj.size_data(1), 3); %variable to store location of min and max with data id
+        obj.SEG_min_max = zeros(obj.size_data(1), 2); %variable to store location of min and max with data id
 
         if (is_seg)
             num_per_seg = ceil(seg_len * RFs / 1000); %how many points per segment
@@ -431,7 +433,7 @@ methods
     end
 
     function res = UpdateFeatures(obj)
-        min2 = obj.SEG_min_max(obj.total_seg_idx,3);
+        min2 = obj.SEG_min_max(obj.total_seg_idx,2);
 
         if length(obj.PPG_filtered) < obj.next_peak || min2 >= obj.next_peak
             res = false;
@@ -470,14 +472,12 @@ methods
 
         if min2 == 0
             res = false;
-            obj.SEG_min_max(obj.total_seg_idx,1) = obj.Sub_ID;
             return;
         end
 
         %create matrix for segment information
-        obj.SEG_min_max(obj.total_seg_idx,1) = obj.Sub_ID;
-        obj.SEG_min_max(obj.total_seg_idx,2) = min1 - ceil(obj.RFs/50);
-        obj.SEG_min_max(obj.total_seg_idx,3) = min2 + ceil(obj.RFs/50);
+        obj.SEG_min_max(obj.total_seg_idx,1) = min1 - ceil(obj.RFs/50);
+        obj.SEG_min_max(obj.total_seg_idx,2) = min2 + ceil(obj.RFs/50);
 
         %select the segment from the filtered ppg
         obj.seg = obj.PPG_filtered(obj.total_seg_idx, (min1 - ceil(obj.RFs/50)):(min2 + ceil(obj.RFs/50)));
@@ -646,9 +646,11 @@ methods
         end    
     end
 
-    function GenerateOutput(obj)
+    function GenerateOutput(obj, if_mat)
 
         disp("generating output");
+
+        date_string = string(datetime, 'MM-dd_HH-mm');
 
         %save segmented data of PPG for zero padded values
         %arr_size = size(obj.PPG_SEG);
@@ -661,11 +663,6 @@ methods
         %obj.APG_SEG = resize(obj.APG_SEG, [obj.total_seg_idx arr_size(2)]);
         %writematrix(obj.APG_SEG, 'APG_Segments.xlsx')
         %APG_s = obj.APG_SEG;
-
-        %save location of min and max with segment
-        obj.SEG_min_max = resize(obj.SEG_min_max, [obj.total_seg_idx 3]);
-        writematrix(obj.SEG_min_max, 'ID_min1_min2.xlsx', WriteMode='overwritesheet')
-        SMM = obj.SEG_min_max;
 
         %save filtered data of the whole input PPG 219 x 2100
         %writematrix(obj.PPG_filtered, 'PPG_Filtered_HighSQI.xlsx')
@@ -698,21 +695,28 @@ methods
                          's_sp_c_ppg', 's_sp_d_ppg', 's_b_sp_ppg', 's_b_c_ppg', 's_b_d_ppg', 's_u_sp_ppg', 's_on_sp_ppg', ...
                          's_a_b_ppg', 's_a_b_apg', 's_b_sp_apg', 's_b_c_apg', 's_b_d_apg', 's_b_e_apg', 's_sp_c_apg', ...
                          's_u_sp_apg', 's_on_sp_apg'});
-        writetable(feature_table, 'PPG_features.xlsx', WriteMode='overwritesheet')
-        P_feat = obj.feature.total;
+        
 
-        %save c and d presence table
-        obj.c_d_APG = resize(obj.c_d_APG, [obj.total_seg_idx 1]);
-        writematrix(obj.c_d_APG, 'c_d_presence.xlsx', WriteMode='overwritesheet')
-        C_D = obj.c_d_APG;
-
-        %save entry and segment index table
+        % entry and segment index
         obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.total_seg_idx 2]);
-        writematrix(obj.entry_and_seg_id, 'entry_and_seg_id.xlsx', WriteMode='overwritesheet')
-        index = obj.entry_and_seg_id;
 
-        %save 'Results30Jan' 'PPG' 'APG_s' 'SMM' 'P_feat' PPG_fil 'C_D' 'index','-mat';
-        save 'Results30Jan' 'SMM' 'P_feat' 'C_D' 'index','-mat';
+        % location of min and max within segment
+        obj.SEG_min_max = resize(obj.SEG_min_max, [obj.total_seg_idx 2]);
+
+        % c and d presence in segment
+        obj.c_d_APG = resize(obj.c_d_APG, [obj.total_seg_idx 1]);
+
+        info_table = array2table([obj.entry_and_seg_id obj.SEG_min_max obj.c_d_APG], ...
+                                 'VariableNames', {'entry_id', 'segment_id', 'min_1', 'min_2', 'c_d_pres'});
+
+        if if_mat
+            save('PPG_Results_' + date_string, 'feature_table', 'info_table')
+        else
+            writetable(feature_table, 'PPG_features_' + date_string + '.csv', WriteMode='overwrite')
+            writetable(info_table, 'PPG_info_' + date_string + '.csv', WriteMode='overwrite');
+        end
+
+        
     end
 
     %calculate features for every entry in the loaded dataset
@@ -787,7 +791,7 @@ methods (Access = private)
             %if the assumed total number of segemnts after division is larger than previously assumed, resize array to fit assumtion
         elseif (obj.is_seg == true && obj.total_seg_idx + (obj.num_entries - obj.entry_idx + 1) * obj.num_seg > obj.size_data(1))
             obj.size_data(1) = obj.total_seg_idx + (obj.num_entries - obj.entry_idx + 1) * obj.num_seg;
-            obj.SEG_min_max = resize(obj.SEG_min_max, [obj.size_data(1) 3]);
+            obj.SEG_min_max = resize(obj.SEG_min_max, [obj.size_data(1) 2]);
             obj.PPG_filtered = resize(obj.PPG_filtered, [obj.size_data(1) obj.size_data(2)]);
             obj.PPG_SEG = resize(obj.PPG_SEG, [obj.size_data(1) obj.size_data(2)]);
             obj.APG_SEG = resize(obj.APG_SEG, [obj.size_data(1) obj.size_data(2)]);
