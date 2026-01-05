@@ -1,13 +1,13 @@
-function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, RFs, PPG)
+function [index, corr_quality, skew_quality, seg_quality, quality] = CalcBestCycle(start_index, end_index, peak_index, RFs, PPG)
     % How many cycles at the start/end to cut off
     start_buffer = 0;
     end_buffer = 0;
 
-    index = 0;
+    index = NaN;
     corr_sum = 0;
-    quality = -100;
-    max_corr_quality = 0;
-    max_skew_quality = 0;
+    quality = NaN;
+    max_corr_quality = NaN;
+    max_skew_quality = NaN;
     seg_len = length(PPG);
 
     num_cycle = length(start_index);
@@ -80,7 +80,7 @@ function [index, corr_quality, skew_quality, seg_quality] = CalcBestCycle(start_
         %Get skewness for cycle plus, upto, 1 seconds before and after
         skew_quality = skewness(PPG(p1:p2));
 
-        if (corr_quality * (skew_quality / 2)) > quality
+        if (corr_quality * (skew_quality / 2)) > quality || isnan(quality)
             index = i;
             quality = (corr_quality * (skew_quality / 2));
             max_corr_quality = corr_quality;

@@ -45,6 +45,8 @@ classdef ppg_anal < handle
         next_peak % systolic peak of next cycle
 
         entry_and_seg_id % id of the entry and the segment of the entry
+
+        cor_skew_seg_comb_qual % different quality metrics for segment/cycle 
     end
 
     properties (Access = private)
@@ -177,6 +179,7 @@ methods
         total_seg = obj.size_data(1) * obj.num_seg;
 
         obj.entry_and_seg_id = zeros(total_seg, 2);
+        obj.cor_skew_seg_comb_qual = zeros(total_seg, 4);
 
         obj.SEG_min_max = zeros(obj.size_data(1) * obj.num_seg, 2); %variable to store location of min and max with data id
         filtered = zeros(obj.size_data); %Create matrix to store filtered PPG 
@@ -360,6 +363,7 @@ methods
         
         obj.c_d_APG = zeros(obj.size_data(1), 1);
         obj.entry_and_seg_id = zeros(obj.size_data(1), 2);
+        obj.cor_skew_seg_comb_qual = zeros(obj.size_data(1), 4);
 
         % Create empty Ssqi values
         A = ones(1,1);
@@ -416,17 +420,18 @@ methods
             "MinSeparation", ceil(obj.RFs/10));
     end
 
-    function [start_idx, end_idx, corr_qulity, skew_quality, seg_quality] = FindBestCycle(obj)
+    function [start_idx, end_idx, corr_qulity, skew_quality, seg_quality, quality] = FindBestCycle(obj)
         [start_index, end_index, peak_index] = obj.FindCycles();
-        [cycle_idx, corr_qulity, skew_quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
+        [cycle_idx, corr_qulity, skew_quality, seg_quality, quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
 
-        if cycle_idx == 0
-            start_idx = 0;
-            end_idx = 0;
-            skew_quality = 0;
-            seg_quality = 0;
+
+        if isnan(cycle_idx)
+            start_idx = NaN;
+            end_idx = NaN;
             return
         end
+
+        obj.cor_skew_seg_comb_qual(obj.total_seg_idx, :) = [corr_qulity, skew_quality, seg_quality, quality];
 
         start_idx = start_index(cycle_idx);
         end_idx = end_index(cycle_idx);
@@ -470,7 +475,7 @@ methods
     function res = CalculateFiducial(obj, min1, min2)
         res = true;
 
-        if min2 == 0
+        if isnan(min1) || isnan(min2)
             res = false;
             return;
         end
@@ -706,8 +711,11 @@ methods
         % c and d presence in segment
         obj.c_d_APG = resize(obj.c_d_APG, [obj.total_seg_idx 1]);
 
-        info_table = array2table([obj.entry_and_seg_id obj.SEG_min_max obj.c_d_APG], ...
-                                 'VariableNames', {'entry_id', 'segment_id', 'min_1', 'min_2', 'c_d_pres'});
+        obj.cor_skew_seg_comb_qual = resize(obj.cor_skew_seg_comb_qual, [obj.total_seg_idx 4]);
+
+        info_table = array2table([obj.entry_and_seg_id obj.SEG_min_max obj.c_d_APG obj.cor_skew_seg_comb_qual], ...
+                                 'VariableNames', {'entry_id', 'segment_id', 'min_1', 'min_2', 'c_d_pres', ...
+                                                   'corr_qual', 'skew_qual', 'seg_qual', 'comb_qual'});
 
         if if_mat
             save('PPG_Results_' + date_string, 'feature_table', 'info_table')
@@ -824,6 +832,7 @@ methods (Access = private)
 
             obj.c_d_APG = resize(obj.c_d_APG, [obj.size_data(1) 1]);
             obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.size_data(1) 2]);
+            obj.cor_skew_seg_comb_qual = resize(obj.cor_skew_seg_comb_qual, [obj.size_data(1) 4]);
         end
 
         %Create Filter 
