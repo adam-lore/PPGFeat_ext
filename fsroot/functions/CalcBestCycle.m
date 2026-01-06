@@ -79,11 +79,11 @@ function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality,
     for i = 1 + start_buffer:num_cycle - end_buffer
         
         % Add a second before and after cycle
-        %p1 = start_index(i) - RFs;
-        %p2 = end_index(i) + RFs;
+        p1 = start_index(i) - RFs;
+        p2 = end_index(i) + RFs;
 
-        p1 = start_index(i);
-        p2 = end_index(i);
+        %p1 = start_index(i);
+        %p2 = end_index(i);
 
 
         if p1 < 1
@@ -110,7 +110,7 @@ function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality,
             skew_quality = 1;
         end
 
-        if (corr_quality * (skew_quality / 2)) > quality || isnan(quality)
+        if (corr_quality * (skew_quality / 2)) * 2 > quality || isnan(quality)
             index = i;
             quality = (corr_quality * (skew_quality / 2));
             max_corr_quality = corr_quality;
