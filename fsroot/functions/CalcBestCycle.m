@@ -1,28 +1,39 @@
-function [index, corr_quality, skew_quality, seg_quality, quality] = CalcBestCycle(start_index, end_index, peak_index, RFs, PPG)
+function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality, quality] = CalcBestCycle(start_index, end_index, peak_index, RFs, PPG)
     % How many cycles at the start/end to cut off
     start_buffer = 0;
     end_buffer = 0;
 
     index = NaN;
     corr_sum = 0;
+    skew_sum = 0;
     quality = NaN;
     max_corr_quality = NaN;
     max_skew_quality = NaN;
+    corr_quality = NaN;
+    skew_quality = NaN;
+    seg_corr_quality = NaN;
+    seg_skew_quality = NaN;
+
     seg_len = length(PPG);
 
     num_cycle = length(start_index);
 
     mean_cycle = 0;
 
+    %ecg_corr = NaN;
+
     if num_cycle > 2
+        %if length(ecg_max) > 1
+        %    ecg_corr = length(peak_index) / length(ecg_max);
+        %end
+
         % Calculate the median beat-to-beat interval
-        if (~mod(num_cycle,2))
-            median_interval = ceil(peak_index(floor(num_cycle / 2) + 1) - peak_index(floor(num_cycle / 2)));
-        else
-            median = ceil(num_cycle / 2);
-            median_interval = ceil(((peak_index(median) - peak_index(median - 1)) + ...
-                                    (peak_index(median + 1) - peak_index(median))) / 2);
+        intervals = zeros(length(peak_index) - 1, 1);
+        for i = 1:length(peak_index) - 1
+            intervals(i) = ceil(peak_index(i + 1) - peak_index(i));
         end
+        median_interval = ceil(median(intervals));
+
         centered_cycles = zeros(num_cycle, median_interval);
 
         for i = 1:length(start_index)
@@ -33,6 +44,11 @@ function [index, corr_quality, skew_quality, seg_quality, quality] = CalcBestCyc
             % See of centered cycle fits in segment
             if i1 < 1
                 start_buffer = 1;
+
+                if length(centered_cycles) < 1
+                    return
+                end
+
                 % Remove first column
                 centered_cycles(1,:) = [];
                 num_cycle = num_cycle - 1;
@@ -40,6 +56,11 @@ function [index, corr_quality, skew_quality, seg_quality, quality] = CalcBestCyc
             end
             if i2 > seg_len
                 end_buffer = 1;
+
+                if (num_cycle - start_buffer) < 1
+                    return
+                end
+
                 % Remove last column
                 centered_cycles(num_cycle - start_buffer,:) = [];
                 num_cycle = num_cycle - 1;
@@ -58,8 +79,12 @@ function [index, corr_quality, skew_quality, seg_quality, quality] = CalcBestCyc
     for i = 1 + start_buffer:num_cycle - end_buffer
         
         % Add a second before and after cycle
-        p1 = start_index(i) - RFs;
-        p2 = end_index(i) + RFs;
+        %p1 = start_index(i) - RFs;
+        %p2 = end_index(i) + RFs;
+
+        p1 = start_index(i);
+        p2 = end_index(i);
+
 
         if p1 < 1
             p1 = 1;
@@ -79,6 +104,11 @@ function [index, corr_quality, skew_quality, seg_quality, quality] = CalcBestCyc
 
         %Get skewness for cycle plus, upto, 1 seconds before and after
         skew_quality = skewness(PPG(p1:p2));
+        skew_sum = skew_sum + skew_quality;
+
+        if skew_quality > 1
+            skew_quality = 1;
+        end
 
         if (corr_quality * (skew_quality / 2)) > quality || isnan(quality)
             index = i;
@@ -91,6 +121,8 @@ function [index, corr_quality, skew_quality, seg_quality, quality] = CalcBestCyc
     corr_quality = max_corr_quality;
     skew_quality = max_skew_quality;
     
-    seg_quality = corr_sum / (num_cycle - start_buffer - end_buffer);
+    seg_corr_quality = corr_sum / (num_cycle - start_buffer - end_buffer);
+    seg_skew_quality = skew_sum / (num_cycle - start_buffer - end_buffer);
+
     return;
 end

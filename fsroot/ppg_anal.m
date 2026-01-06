@@ -31,6 +31,9 @@ classdef ppg_anal < handle
 
         c_d_pres % presence of c and d
 
+        loaded_ecg % TEMPORARY FOR CALCULATING WITH ECG
+        ECG_Filtered % ---||---
+
         %Vectors for segment
 
         OnSpDnDpOff %for PPG
@@ -46,7 +49,7 @@ classdef ppg_anal < handle
 
         entry_and_seg_id % id of the entry and the segment of the entry
 
-        cor_skew_seg_comb_qual % different quality metrics for segment/cycle 
+        quality_arr % different quality metrics for segment/cycle 
     end
 
     properties (Access = private)
@@ -116,7 +119,7 @@ methods
                                 return
                             end
                         end
-                        obj.loaded_data = rot90(obj.loaded_data(:, ppg_col), 3);
+                        obj.loaded_data = rot90(obj.loaded_data(:, ppg_col));
                     end
                 end
             case '.mat'
@@ -137,9 +140,12 @@ methods
                 if res == false
                     return
                 elseif ~isempty(entry_field)
+                    old_ecg_data = obj.loaded_data;
                     obj.loaded_data = ExtractDotPath(obj.loaded_data, entry_field);
+                    %obj.loaded_ecg = ExtractDotPath(old_ecg_data, {'ekg', 'v'});
                 end
-                obj.loaded_data = rot90(obj.loaded_data, 3);
+                obj.loaded_data = rot90(obj.loaded_data);
+                %obj.loaded_ecg = rot90(obj.loaded_ecg, 3);
             otherwise
                 res = false;
                 return
@@ -150,7 +156,7 @@ methods
         % The data may be orientated differently when there is only one entry
         % (And anyone who organized each entry by column is crazy)
         if obj.size_data(1) > obj.size_data(2)
-            obj.loaded_data = rot90(obj.loaded_data, 3);
+            obj.loaded_data = rot90(obj.loaded_data);
 
             [row_num, tf] = listdlg('PromptString', {'Select the column with PPG data'}, ...
                                         'SelectionMode', 'single', 'ListString', string(1:obj.size_data(2)));
@@ -174,15 +180,17 @@ methods
             obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ceil(obj.size_data(2) * (RFs / OFs))); %Create matrix to store resampled PPG
         else
             obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * RFs) / 1000)); %Create matrix to store resampled PPG
+            %obj.ECG_Filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * RFs) / 1000));
         end
 
         total_seg = obj.size_data(1) * obj.num_seg;
 
         obj.entry_and_seg_id = zeros(total_seg, 2);
-        obj.cor_skew_seg_comb_qual = zeros(total_seg, 4);
+        obj.quality_arr = zeros(total_seg, 5);
 
         obj.SEG_min_max = zeros(obj.size_data(1) * obj.num_seg, 2); %variable to store location of min and max with data id
         filtered = zeros(obj.size_data); %Create matrix to store filtered PPG 
+        %ecg_filtered = zeros(obj.size_data); %Create matrix to store filtered ECG
         
         
         obj.PPG_SEG = zeros(obj.size_data(1) * obj.num_seg, ceil((obj.size_data(2) - (obj.size_data(2)/3)) * (RFs / OFs) / obj.num_seg)); %create matrix to store segment
@@ -194,17 +202,25 @@ methods
         [obj.filter_sos , obj.g] = ss2sos(A,B,C,F);
 
         for i = 1:obj.size_data(1)
+            %if (anynan(obj.loaded_data(i)) || anynan(obj.loaded_ecg(i)))
             if (anynan(obj.loaded_data(i)))
                 obj.loaded_data(i, isnan(obj.loaded_data)) = 0; %replace NaN with 0
+                %obj.loaded_ecg(i, isnan(obj.loaded_ecg)) = 0; %replace NaN with 0
             end
 
             %apply filter to all data
             filtered_data = filtfilt(obj.filter_sos, obj.g, obj.loaded_data(i,:));
+            %filtered_ecg = filtfilt(obj.filter_sos, obj.g, obj.loaded_ecg(i,:));
 
             %normalizing the data
             m = mean(filtered_data);
             st = std(filtered_data);
             filtered(i, :) = (filtered_data - m)/st; %store filtered data
+
+            %normalizing the data
+            %m = mean(filtered_ecg);
+            %st = std(filtered_ecg);
+            %ecg_filtered(i, :) = (filtered_ecg - m)/st; %store filtered data
         end
 
         if (RFs ~= OFs)
@@ -245,6 +261,7 @@ methods
                             end_seg = obj.size_data(2);
                         end
                         obj.PPG_filtered(1 + ((i - 1) * obj.num_seg) + j, :) = resize(filtered(i, start_seg:end_seg), num_per_seg);
+                        %obj.ECG_Filtered(1 + ((i - 1) * obj.num_seg) + j, :) = resize(obj.loaded_ecg(i, start_seg:end_seg), num_per_seg);
                         obj.entry_and_seg_id(1 + ((i - 1) * obj.num_seg) + j, :) = [i j + 1];
                     end
                 end
@@ -363,7 +380,7 @@ methods
         
         obj.c_d_APG = zeros(obj.size_data(1), 1);
         obj.entry_and_seg_id = zeros(obj.size_data(1), 2);
-        obj.cor_skew_seg_comb_qual = zeros(obj.size_data(1), 4);
+        obj.quality_arr = zeros(obj.size_data(1), 5);
 
         % Create empty Ssqi values
         A = ones(1,1);
@@ -412,6 +429,12 @@ methods
 
     function [PPG_max, PPG_min] = FindSegMaxMin(obj)
 
+        %if (if_ecg)
+        %    segment = obj.ECG_Filtered(obj.total_seg_idx ,:);
+        %else
+        %    segment = obj.PPG_filtered(obj.total_seg_idx ,:);
+        %end
+
         segment = obj.PPG_filtered(obj.total_seg_idx ,:);
         %find maxima and minima of current segment
         PPG_max = islocalmax(segment ,"MinProminence",0.5,"FlatSelection","all",...
@@ -420,9 +443,13 @@ methods
             "MinSeparation", ceil(obj.RFs/10));
     end
 
-    function [start_idx, end_idx, corr_qulity, skew_quality, seg_quality, quality] = FindBestCycle(obj)
+    function [start_idx, end_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality] = FindBestCycle(obj)
         [start_index, end_index, peak_index] = obj.FindCycles();
-        [cycle_idx, corr_qulity, skew_quality, seg_quality, quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
+        %[ecg_max, ecg_min] = obj.FindSegMaxMin();
+
+        %index_ECG_max = find(ecg_max);
+
+        [cycle_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
 
 
         if isnan(cycle_idx)
@@ -431,7 +458,7 @@ methods
             return
         end
 
-        obj.cor_skew_seg_comb_qual(obj.total_seg_idx, :) = [corr_qulity, skew_quality, seg_quality, quality];
+        obj.quality_arr(obj.total_seg_idx, :) = [corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality];
 
         start_idx = start_index(cycle_idx);
         end_idx = end_index(cycle_idx);
@@ -440,8 +467,8 @@ methods
     function res = UpdateFeatures(obj)
         min2 = obj.SEG_min_max(obj.total_seg_idx,2);
 
-        if length(obj.PPG_filtered) < obj.next_peak || min2 >= obj.next_peak
-            res = false;
+        if isempty(obj.next_peak) || length(obj.PPG_filtered) < obj.next_peak || min2 >= obj.next_peak
+            next_u = NaN;
         else
 
             %calculate u of the next cycle which is needed to calculate extra features
@@ -455,20 +482,24 @@ methods
             next_u = find(PPG_vpg_max, 1); %index of maxima points
 
             if isempty(next_u)
-                res = false;
-                return
+                next_u = NaN;
             end
+        end
+        feature_struct  = CalcFeatures(obj.OnSpDnDpOff, obj.uxvw, next_u, obj.abcdef, obj.OnSpDnDpOff_time, obj.uxvw_time, obj.abcdef_time, obj.seg, obj.VPG, obj.APG, obj.RFs);
 
-            feature_struct  = CalcFeatures(obj.OnSpDnDpOff, obj.uxvw, next_u, obj.abcdef, obj.OnSpDnDpOff_time, obj.uxvw_time, obj.abcdef_time, obj.seg, obj.VPG, obj.APG, obj.RFs);
+        obj.feature.total(obj.total_seg_idx,:) = feature_struct.total;
+        obj.feature.fiducial_value(obj.total_seg_idx,:) = feature_struct.fiducial_value;
+        obj.feature.fiducial_time(obj.total_seg_idx,:) = feature_struct.fiducial_time;
+        obj.feature.timespan(obj.total_seg_idx,:) = feature_struct.timespan;
+        obj.feature.amplitude(obj.total_seg_idx,:) = feature_struct.amplitude;
+        obj.feature.vpg_apg(obj.total_seg_idx,:) = feature_struct.vpg_apg;
+        obj.feature.waveform_area(obj.total_seg_idx,:) = feature_struct.waveform_area;
+        obj.feature.ratio(obj.total_seg_idx,:) = feature_struct.ratio;
 
-            obj.feature.total(obj.total_seg_idx,:) = feature_struct.total;
-            obj.feature.fiducial_value(obj.total_seg_idx,:) = feature_struct.fiducial_value;
-            obj.feature.fiducial_time(obj.total_seg_idx,:) = feature_struct.fiducial_time;
-            obj.feature.timespan(obj.total_seg_idx,:) = feature_struct.timespan;
-            obj.feature.amplitude(obj.total_seg_idx,:) = feature_struct.amplitude;
-            obj.feature.vpg_apg(obj.total_seg_idx,:) = feature_struct.vpg_apg;
-            obj.feature.waveform_area(obj.total_seg_idx,:) = feature_struct.waveform_area;
-            obj.feature.ratio(obj.total_seg_idx,:) = feature_struct.ratio;
+        if anynan(obj.feature.total)
+            res = false;
+        else
+            res = true;
         end
     end
 
@@ -644,11 +675,7 @@ methods
         next_max = islocalmax(next_cycle_seg ,"MinProminence",0.1,"FlatSelection","all",...
             "MinSeparation", ceil(obj.RFs/5));
         obj.next_peak = find(next_max, 1) + min2;
-        if ~isempty(obj.next_peak)
-            UpdateFeatures(obj);
-        else
-            res = false;
-        end    
+        UpdateFeatures(obj);
     end
 
     function GenerateOutput(obj, if_mat)
@@ -711,17 +738,17 @@ methods
         % c and d presence in segment
         obj.c_d_APG = resize(obj.c_d_APG, [obj.total_seg_idx 1]);
 
-        obj.cor_skew_seg_comb_qual = resize(obj.cor_skew_seg_comb_qual, [obj.total_seg_idx 4]);
+        obj.quality_arr = resize(obj.quality_arr, [obj.total_seg_idx 5]);
 
-        info_table = array2table([obj.entry_and_seg_id obj.SEG_min_max obj.c_d_APG obj.cor_skew_seg_comb_qual], ...
+        info_table = array2table([obj.entry_and_seg_id obj.SEG_min_max obj.c_d_APG obj.quality_arr], ...
                                  'VariableNames', {'entry_id', 'segment_id', 'min_1', 'min_2', 'c_d_pres', ...
-                                                   'corr_qual', 'skew_qual', 'seg_qual', 'comb_qual'});
+                                                   'corr_qual', 'skew_qual', 'seg_corr_qual', 'seg_skew_qual', 'comb_qual'});
 
         if if_mat
             save('PPG_Results_' + date_string, 'feature_table', 'info_table')
         else
-            writetable(feature_table, 'PPG_features_' + date_string + '.csv', WriteMode='overwrite')
-            writetable(info_table, 'PPG_info_' + date_string + '.csv', WriteMode='overwrite');
+            writetable(feature_table, 'PPG_features_' + date_string + '.xlsx', WriteMode='overwrite')
+            writetable(info_table, 'PPG_info_' + date_string + '.xlsx', WriteMode='overwrite');
         end
 
         
@@ -763,17 +790,17 @@ methods (Access = private)
                 obj.loaded_data = obj.loaded_data.(mat_var);
 
                 if (isa(obj.loaded_data, 'timeseries'))
-                    obj.loaded_data = rot90(obj.loaded_data.Data, 3);
+                    obj.loaded_data = rot90(obj.loaded_data.Data);
                 else
-                    obj.loaded_data = rot90(obj.loaded_data, 3);
+                    obj.loaded_data = rot90(obj.loaded_data);
                 end
 
             else
-                obj.loaded_data = rot90(obj.loaded_data.data(:, obj.data_col), 3);
+                obj.loaded_data = rot90(obj.loaded_data.data(:, obj.data_col));
             end
         else
             if (~strcmp(obj.dir_ext, '.txt'))
-                obj.loaded_data = rot90(obj.loaded_data, 3);
+                obj.loaded_data = rot90(obj.loaded_data);
             end
         end
 
@@ -832,7 +859,7 @@ methods (Access = private)
 
             obj.c_d_APG = resize(obj.c_d_APG, [obj.size_data(1) 1]);
             obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.size_data(1) 2]);
-            obj.cor_skew_seg_comb_qual = resize(obj.cor_skew_seg_comb_qual, [obj.size_data(1) 4]);
+            obj.quality_arr = resize(obj.quality_arr, [obj.size_data(1) 5]);
         end
 
         %Create Filter 
