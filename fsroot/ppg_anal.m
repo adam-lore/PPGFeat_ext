@@ -31,9 +31,6 @@ classdef ppg_anal < handle
 
         c_d_pres % presence of c and d
 
-        loaded_ecg % TEMPORARY FOR CALCULATING WITH ECG
-        ECG_Filtered % ---||---
-
         %Vectors for segment
 
         OnSpDnDpOff %for PPG
@@ -55,6 +52,7 @@ classdef ppg_anal < handle
     properties (Access = private)
         is_dir % wheter data is loaded from a directory or a file
         dir_files % to store files in directory
+        dir_folder % to store folder name
         num_entries % number of files in directory
         dir_ext % extension of files in directory to load
         data_col % what column the data is in
@@ -140,7 +138,7 @@ methods
                 if res == false
                     return
                 elseif ~isempty(entry_field)
-                    old_ecg_data = obj.loaded_data;
+                    %old_ecg_data = obj.loaded_data;
                     obj.loaded_data = ExtractDotPath(obj.loaded_data, entry_field);
                     %obj.loaded_ecg = ExtractDotPath(old_ecg_data, {'ekg', 'v'});
                 end
@@ -324,9 +322,14 @@ methods
         end
 
         obj.dir_ext = allowed_extensions{idx};
-        obj.dir_files = dir([path, '\*' obj.dir_ext]);
+        directory = dir([path, '\*' obj.dir_ext]);
 
-        obj.size_data = [size(obj.dir_files), 1]; %read number of entries
+        obj.dir_files = {directory.name};
+        obj.dir_files = natsortfiles(obj.dir_files);
+        first_file = directory(1);
+        obj.dir_folder = first_file.folder;
+
+        obj.size_data = [length(obj.dir_files), 1]; %read number of entries
         obj.num_entries = obj.size_data(1);
 
         if (obj.num_entries == 0)
@@ -334,7 +337,7 @@ methods
             return
         end
 
-        first_file = importdata([obj.dir_files(1).folder '\' obj.dir_files(1).name]);
+        first_file = importdata(strjoin([obj.dir_folder '\' obj.dir_files(1)], ''));
 
         if (isa(first_file, 'struct'))
             if (strcmp(obj.dir_ext, '.mat'))
@@ -776,7 +779,7 @@ end
 
 methods (Access = private)
     function LoadFile(obj)
-        filepath = [obj.dir_files(obj.entry_idx).folder '\' obj.dir_files(obj.entry_idx).name];
+        filepath = strjoin([obj.dir_folder '\' obj.dir_files(obj.entry_idx)], '');
 
         
         obj.loaded_data = importdata(filepath);
