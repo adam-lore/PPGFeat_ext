@@ -36,6 +36,8 @@ classdef ppg_anal < handle
         OnSpDnDpOff %for PPG
         uxvw %for VPG
         abcdef %for APG
+
+        fiducial %store fiducial table
         feature %store feature table
 
         OnSpDnDpOff_time % dt values of PPG
@@ -271,6 +273,9 @@ methods
         obj.uxvw = NaN(1,4);
         obj.abcdef = NaN(1,5);
 
+        obj.fiducial = struct('OnSpDnDpOff_value', NaN(obj.size_data(1),5), 'uxvw_value', NaN(obj.size_data(1),4), ...
+                              'abcdef_value', NaN(obj.size_data(1),6), 'OnSpDnDpOff_index', NaN(obj.size_data(1),5), ...
+                              'uxvw_index', NaN(obj.size_data(1),4), 'abcdef_index', NaN(obj.size_data(1),6));
         obj.feature = struct('total', NaN(total_seg,147), 'fiducial_value', NaN(total_seg,15), 'fiducial_time', NaN(total_seg,15), ...
                                 'timespan', NaN(total_seg,23), 'amplitude', NaN(total_seg,14), ...
                                 'vpg_apg', NaN(total_seg,12), 'waveform_area', NaN(total_seg,4), ...
@@ -376,6 +381,9 @@ methods
         obj.uxvw = NaN(1,4);
         obj.abcdef = NaN(1,5);
 
+        obj.fiducial = struct('OnSpDnDpOff_value', NaN(obj.size_data(1),5), 'uxvw_value', NaN(obj.size_data(1),4), ...
+                              'abcdef_value', NaN(obj.size_data(1),6), 'OnSpDnDpOff_index', NaN(obj.size_data(1),5), ...
+                              'uxvw_index', NaN(obj.size_data(1),4), 'abcdef_index', NaN(obj.size_data(1),6));
         obj.feature = struct('total', NaN(obj.size_data(1),147), 'fiducial_value', NaN(obj.size_data(1),15), 'fiducial_time', NaN(obj.size_data(1),15), ...
                                 'timespan', NaN(obj.size_data(1),23), 'amplitude', NaN(obj.size_data(1),14), ...
                                 'vpg_apg', NaN(obj.size_data(1),12), 'waveform_area', NaN(obj.size_data(1),4), ...
@@ -430,7 +438,7 @@ methods
         end
     end
 
-    function [PPG_max, PPG_min] = FindSegMaxMin(obj)
+    function [PPG_max_index, PPG_min_index] = FindSegMaxMin(obj)
 
         %if (if_ecg)
         %    segment = obj.ECG_Filtered(obj.total_seg_idx ,:);
@@ -442,8 +450,19 @@ methods
         %find maxima and minima of current segment
         PPG_max = islocalmax(segment ,"MinProminence",0.5,"FlatSelection","all",...
             "MinSeparation", ceil(obj.RFs/5));
-        PPG_min = islocalmin(segment ,"MinProminence",0.5,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/10));
+        %tries to find a peak close after minima
+        PPG_min = islocalmin(segment ,"MinProminence",0.5, "ProminenceWindow",[0 ceil(obj.RFs/5)], "FlatSelection","all",...
+            "MinSeparation", ceil(obj.RFs/5));
+        %exception if it is the last minima
+        PPG_last_min = islocalmin(flip(segment(end - ceil(obj.RFs/5):end)), "MaxNumExtrema", 1);
+
+        PPG_max_index = find(PPG_max);
+        PPG_min_index = find(PPG_min);
+        PPG_last_min_index = find(flip(PPG_last_min)) + (length(segment) - ceil(obj.RFs/5));
+
+        if ~isempty(PPG_last_min_index) && ~isempty(PPG_min_index) && PPG_last_min_index(1) ~= PPG_min_index(end)
+            PPG_min_index(end + 1) = PPG_last_min_index(1);
+        end
     end
 
     function [start_idx, end_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality] = FindBestCycle(obj)
@@ -488,6 +507,13 @@ methods
                 next_u = NaN;
             end
         end
+        obj.fiducial.OnSpDnDpOff_value(obj.total_seg_idx, :) = obj.OnSpDnDpOff;
+        obj.fiducial.uxvw_value(obj.total_seg_idx, :) = obj.uxvw;
+        obj.fiducial.abcdef_value(obj.total_seg_idx, :) = obj.abcdef;
+        obj.fiducial.OnSpDnDpOff_index(obj.total_seg_idx, :) = obj.OnSpDnDpOff_time;
+        obj.fiducial.uxvw_index(obj.total_seg_idx, :) = obj.uxvw_time;
+        obj.fiducial.abcdef_index(obj.total_seg_idx, :) = obj.abcdef_time;
+
         feature_struct  = CalcFeatures(obj.OnSpDnDpOff, obj.uxvw, next_u, obj.abcdef, obj.OnSpDnDpOff_time, obj.uxvw_time, obj.abcdef_time, obj.seg, obj.VPG, obj.APG, obj.RFs);
 
         obj.feature.total(obj.total_seg_idx,:) = feature_struct.total;
@@ -515,11 +541,19 @@ methods
         end
 
         %create matrix for segment information
-        obj.SEG_min_max(obj.total_seg_idx,1) = min1 - ceil(obj.RFs/50);
-        obj.SEG_min_max(obj.total_seg_idx,2) = min2 + ceil(obj.RFs/50);
+        if min1 - ceil(obj.RFs/50) < 1
+            obj.SEG_min_max(obj.total_seg_idx,1) = 1;
+        else
+            obj.SEG_min_max(obj.total_seg_idx,1) = min1 - ceil(obj.RFs/50);
+        end
+        if min2 + ceil(obj.RFs/50) > length(obj.PPG_filtered)
+            obj.SEG_min_max(obj.total_seg_idx,2) = length(obj.PPG_filtered);
+        else
+            obj.SEG_min_max(obj.total_seg_idx,2) = min2 + ceil(obj.RFs/50);
+        end
 
         %select the segment from the filtered ppg
-        obj.seg = obj.PPG_filtered(obj.total_seg_idx, (min1 - ceil(obj.RFs/50)):(min2 + ceil(obj.RFs/50)));
+        obj.seg = obj.PPG_filtered(obj.total_seg_idx, obj.SEG_min_max(obj.total_seg_idx,1):obj.SEG_min_max(obj.total_seg_idx,2));
         %plot(obj.seg);
         %calculate 2.5% of T
         obj.T2_5 = floor((((min2 - min1))/100)*2.5);
@@ -703,6 +737,21 @@ methods
         %writematrix(obj.PPG_filtered, 'PPG_Filtered_HighSQI.xlsx')
         %PPG_fil = obj.PPG_filtered;
 
+        %save fiducial table
+        obj.fiducial.OnSpDnDpOff_value = resize(obj.fiducial.OnSpDnDpOff_value, [obj.total_seg_idx 5]);
+        obj.fiducial.uxvw_value = resize(obj.fiducial.uxvw_value, [obj.total_seg_idx 4]);
+        obj.fiducial.abcdef_value = resize(obj.fiducial.abcdef_value, [obj.total_seg_idx 6]);
+        obj.fiducial.OnSpDnDpOff_index = resize(obj.fiducial.OnSpDnDpOff_index, [obj.total_seg_idx 5]);
+        obj.fiducial.uxvw_index = resize(obj.fiducial.uxvw_index, [obj.total_seg_idx 4]);
+        obj.fiducial.abcdef_index = resize(obj.fiducial.abcdef_index, [obj.total_seg_idx 6]);
+
+        fiducial_table = array2table([obj.fiducial.OnSpDnDpOff_value obj.fiducial.uxvw_value obj.fiducial.abcdef_value ...
+                                      obj.fiducial.OnSpDnDpOff_index obj.fiducial.uxvw_index obj.fiducial.abcdef_index], ...
+                                      'VariableNames', {'val_on', 'val_sp', 'val_dn', 'val_dp', 'val_off', 'val_u', 'val_x', ...
+                                      'val_v', 'val_w', 'val_a', 'val_b', 'val_c', 'val_d', 'val_e', 'val_f', 'index_on', ...
+                                      'index_sp', 'index_dn', 'index_dp', 'index_off', 'index_u', 'index_x', 'index_v', ...
+                                      'index_w', 'index_a', 'index_b', 'index_c', 'index_d', 'index_e', 'index_f'});
+
         %save total feature table
         obj.feature.total = resize(obj.feature.total, [obj.total_seg_idx 147]);
         %feature_table = array2table(obj.feature.total, 'VariableNames', {'val_on', 'val_sp', 'val_dn', 'val_dp', 'val_off', 'val_u', 'val_x', 'val_v', 'val_w', 'val_a', 'val_b', 'val_c', 'val_d', 'val_e', 'val_f', 'time_on', 'time_sp', 'time_dn', 'time_dp', 'time_off', 'time_u', 'time_x', 'time_v', 'time_w', 'time_a', 'time_b', 'time_c', 'time_d', 'time_e', 'time_f', 'ts_on_sp', 'ts_on_dn', 'ts_on_dp', 'ts_on_u', 'ts_on_v', 'ts_on_a', 'ts_on_b', 'ts_on_c', 'ts_u_next_u', 'ts_sp_c', 'ts_sp_d', 'ts_sp_e', 'ts_sp_dp', 'ts_dn_dp', 'Tm_bb2', 'ts_b_c', 'ts_b_d', 'ts_u_sp', 'ts_u_w', 'ts_u_b', 'ts_u_c', 'ts_u_d', 'ts_a_c', 'am_on_sp', 'am_on_dn', 'am_on_dp', 'am_on_u', 'am_on_v', 'am_on_a', 'am_on_b', 'am_on_c', 'am_on_off', 'am_dn_sp', 'ar_on_dn__on_sp', 'ar_on_dp__on_sp', 'ar_dn_sp__on_sp', 'ar_dp_sp__on_sp', 'val_vpg_c', 'val_vpg_d', 'r_w_u', 'r_v_u', 'r_val_vpg_c__u', 'r_val_vpg_d__u', 'r_b_a', 'r_c_a', 'r_d_a', 'r_e_a', 'r_bcde_a', 'r_bcd_a', 'wa_on_off', 'wa_on_sp', 'wa_on_c', 'wa_on_dn', 'pa_on_sp_ppg', 'pa_u_sp_ppg', 'pa_sp_c_ppg', 'pa_sp_d_ppg', 'pa_on_sp_vpg', 'pa_u_sp_vpg', 'pa_sp_c_vpg', 'pa_sp_d_vpg', 'pa_on_sp_apg', 'pa_u_sp_apg', 'pa_sp_c_apg', 'pa_sp_d_apg', 'pa_on_off_ppg', 'pa_on_off_vpg', 'pa_on_off_apg', 'r_ts_on_a__ts_u_next_u', 'r_ts_on_u__ts_u_next_u', 'r_ts_on_b__ts_u_next_u', 'r_ts_on_sp__ts_u_next_u', 'r_ts_on_c__ts_u_next_u', 'r_ts_on_v__ts_u_next_u', 'r_ts_on_dn__ts_u_next_u', 'r_ts_u_w__ts_u_next_u', 'r_ts_sp_dp__ts_u_next_u', 'r_Tm_bb2_Tss', 'r_am_on_a__am_on_sp', 'r_am_on_u__am_on_sp', 'r_am_on_b__am_on_sp', 'r_am_on_c__am_on_sp', 'r_am_on_v__am_on_sp', 'r_am_on_off__am_on_sp', 'r_wa_dn_off__wa_on_dn', 'r_sp_on', 'r_wa_on_sp__wa_on_off', 'r_wa_on_c__wa_on_off', 'r_wa_on_dn__wa_on_off', 'r_pa_on_sp_ppg__pa_on_off_ppg', 'r_pa_u_sp_ppg__pa_on_off_ppg', 'r_pa_sp_c_ppg__pa_on_off_ppg', 'r_pa_sp_d_ppg__pa_on_off_ppg', 'r_pa_on_sp_vpg__pa_on_off_vpg', 'r_pa_u_sp_vpg__pa_on_off_vpg', 'r_pa_sp_c_vpg__pa_on_off_vpg', 'r_pa_sp_d_vpg__pa_on_off_vpg', 'r_pa_on_sp_apg__pa_on_off_apg', 'r_pa_u_sp_apg__pa_on_off_apg', 'r_pa_sp_c_apg__pa_on_off_apg', 'r_pa_sp_d_apg__pa_on_off_apg', 's_sp_c_ppg', 's_sp_d_ppg', 's_b_sp_ppg', 's_b_c_ppg', 's_b_d_ppg', 's_u_sp_ppg', 's_on_sp_ppg', 's_a_b_ppg', 's_a_b_apg', 's_b_sp_apg', 's_b_c_apg', 's_b_d_apg', 's_b_e_apg', 's_sp_c_apg', 's_u_sp_apg', 's_on_sp_apg'});
@@ -748,8 +797,9 @@ methods
                                                    'corr_qual', 'skew_qual', 'seg_corr_qual', 'seg_skew_qual', 'comb_qual'});
 
         if if_mat
-            save('PPG_Results_' + date_string, 'feature_table', 'info_table')
+            save('PPG_Results_' + date_string, 'fiducial_table', 'feature_table', 'info_table')
         else
+            writetable(fiducial_table, 'PPG_fiducials_' + date_string + '.xlsx', WriteMode='overwrite');
             writetable(feature_table, 'PPG_features_' + date_string + '.xlsx', WriteMode='overwrite')
             writetable(info_table, 'PPG_info_' + date_string + '.xlsx', WriteMode='overwrite');
         end
@@ -834,9 +884,25 @@ methods (Access = private)
             obj.PPG_SEG = resize(obj.PPG_SEG, [obj.size_data(1) obj.size_data(2)]);
             obj.APG_SEG = resize(obj.APG_SEG, [obj.size_data(1) obj.size_data(2)]);
 
-            old_feature = obj.feature;
+            old_fiducial = obj.fiducial;
+            old_fiducial_size = size(obj.fiducial.OnSpDnDpOff_value);
 
-            old_size = size(obj.feature.total);
+            obj.fiducial.OnSpDnDpOff_value = NaN(obj.size_data(1), 5);
+            obj.fiducial.uxvw_value = NaN(obj.size_data(1), 4);
+            obj.fiducial.abcdef_value = NaN(obj.size_data(1), 6);
+            obj.fiducial.OnSpDnDpOff_index = NaN(obj.size_data(1), 5);
+            obj.fiducial.uxvw_index = NaN(obj.size_data(1), 4);
+            obj.fiducial.abcdef_index = NaN(obj.size_data(1), 6);
+            
+            obj.fiducial.OnSpDnDpOff_value(1:old_fiducial_size(1), :) = old_fiducial.OnSpDnDpOff_value;
+            obj.fiducial.uxvw_value(1:old_fiducial_size(1), :) = old_fiducial.uxvw_value;
+            obj.fiducial.abcdef_value(1:old_fiducial_size(1), :) = old_fiducial.abcdef_value;
+            obj.fiducial.OnSpDnDpOff_index(1:old_fiducial_size(1), :) = old_fiducial.OnSpDnDpOff_index;
+            obj.fiducial.uxvw_index(1:old_fiducial_size(1), :) = old_fiducial.uxvw_index;
+            obj.fiducial.abcdef_index(1:old_fiducial_size(1), :) = old_fiducial.abcdef_index;
+
+            old_feature = obj.feature;
+            old_feature_size = size(obj.feature.total);
 
             obj.feature.total = NaN(obj.size_data(1), 147);
             obj.feature.fiducial_value = NaN(obj.size_data(1), 15);
@@ -849,16 +915,16 @@ methods (Access = private)
             obj.feature.ratio = NaN(obj.size_data(1), 33);
             obj.feature.slope = NaN(obj.size_data(1), 16);
 
-            obj.feature.total(1:old_size(1), :) = old_feature.total;
-            obj.feature.fiducial_value(1:old_size(1), :) = old_feature.fiducial_value;
-            obj.feature.fiducial_time(1:old_size(1), :) = old_feature.fiducial_time;
-            obj.feature.timespan(1:old_size(1), :) = old_feature.timespan;
-            obj.feature.amplitude(1:old_size(1), :) = old_feature.amplitude;
-            obj.feature.vpg_apg(1:old_size(1), :) = old_feature.vpg_apg;
-            obj.feature.waveform_area(1:old_size(1), :) = old_feature.waveform_area;
-            obj.feature.power_area(1:old_size(1), :) = old_feature.power_area;
-            obj.feature.ratio(1:old_size(1), :) = old_feature.ratio;
-            obj.feature.slope(1:old_size(1), :) = old_feature.slope;
+            obj.feature.total(1:old_feature_size(1), :) = old_feature.total;
+            obj.feature.fiducial_value(1:old_feature_size(1), :) = old_feature.fiducial_value;
+            obj.feature.fiducial_time(1:old_feature_size(1), :) = old_feature.fiducial_time;
+            obj.feature.timespan(1:old_feature_size(1), :) = old_feature.timespan;
+            obj.feature.amplitude(1:old_feature_size(1), :) = old_feature.amplitude;
+            obj.feature.vpg_apg(1:old_feature_size(1), :) = old_feature.vpg_apg;
+            obj.feature.waveform_area(1:old_feature_size(1), :) = old_feature.waveform_area;
+            obj.feature.power_area(1:old_feature_size(1), :) = old_feature.power_area;
+            obj.feature.ratio(1:old_feature_size(1), :) = old_feature.ratio;
+            obj.feature.slope(1:old_feature_size(1), :) = old_feature.slope;
 
             obj.c_d_APG = resize(obj.c_d_APG, [obj.size_data(1) 1]);
             obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.size_data(1) 2]);
@@ -919,12 +985,11 @@ methods (Access = private)
     end
 
     function [start_index, end_index, peak_index] = FindCycles(obj)
-        [PPG_max, PPG_min] = FindSegMaxMin(obj);
+        [index_PPG_max, index_PPG_min] = FindSegMaxMin(obj);
 
-        index_PPG_max = find(PPG_max);
-        index_PPG_min = find(PPG_min);
-
-        if obj.entry_idx == 12 && obj.seg_idx == 25 && 1 == 2
+        %if obj.entry_idx == 12 && obj.seg_idx == 25
+        if obj.entry_idx == 67
+        %if 1 == 2
             warning('Break reached');
             temp = plot(obj.PPG_filtered(obj.total_seg_idx ,:));
             for i = 1:length(index_PPG_max)
@@ -965,7 +1030,7 @@ methods (Access = private)
                     % Find the highest peak in the cycle
                     if length(maxima_between_minima) > 1
                         for j = 2:length(maxima_between_minima)
-                            if PPG(maxima_between_minima(j)) > peak_value
+                            if obj.PPG_filtered(maxima_between_minima(j)) > peak_value
                                 peak_index(cycle_index) = maxima_between_minima(j);
                                 peak_value = obj.PPG_filtered(maxima_between_minima(j));
                             end

@@ -110,7 +110,8 @@ function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality,
             skew_quality = 1;
         end
 
-        if (corr_quality * (skew_quality / 2)) * 2 > quality || isnan(quality)
+        %if (corr_quality + (0.5* skew_quality)) > quality || isnan(quality)
+        if isnan(quality)
             index = i;
             quality = (corr_quality * (skew_quality / 2));
             max_corr_quality = corr_quality;
