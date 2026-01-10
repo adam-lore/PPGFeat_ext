@@ -558,6 +558,9 @@ methods
         %calculate 2.5% of T
         obj.T2_5 = floor((((min2 - min1))/100)*2.5);
 
+        onset = min1 - obj.SEG_min_max(obj.total_seg_idx,1);
+        offset = min2 - obj.SEG_min_max(obj.total_seg_idx,1);
+
         obj.VPG = diff(obj.seg)*1000;
         obj.VPG = smoothdata(obj.VPG, "movmean", ceil(obj.RFs/20)); %data smoothing using 50 ms window at 1000Hz
         %plot(obj.VPG);
@@ -620,14 +623,10 @@ methods
 
         if length(index_min) < 1 || length(index_max) < 1
             warning('Cannot calculate PPG');
-            onset = NaN;
             sp = NaN;
-            offset = NaN;
         else
             %read all the feature points from PPG VPG and APG
-            onset = index_min(1);
             sp = index_max(1);
-            offset = index_min(end);
         end
 
         z_apg = zerocrossing(obj.APG);
@@ -988,8 +987,8 @@ methods (Access = private)
         [index_PPG_max, index_PPG_min] = FindSegMaxMin(obj);
 
         %if obj.entry_idx == 12 && obj.seg_idx == 25
-        if obj.entry_idx == 67
-        %if 1 == 2
+        %if obj.entry_idx == 67
+        if 1 == 2
             warning('Break reached');
             temp = plot(obj.PPG_filtered(obj.total_seg_idx ,:));
             for i = 1:length(index_PPG_max)
