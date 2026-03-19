@@ -49,12 +49,16 @@ classdef ppg_anal < handle
         entry_and_seg_id % id of the entry and the segment of the entry
 
         quality_arr % different quality metrics for segment/cycle 
+
+
+        dir_files % to store files in directory
+        dir_folder % to store folder name
     end
 
     properties (Access = private)
         is_dir % wheter data is loaded from a directory or a file
-        dir_files % to store files in directory
-        dir_folder % to store folder name
+        %dir_files % to store files in directory
+        %dir_folder % to store folder name
         num_entries % number of files in directory
         dir_ext % extension of files in directory to load
         data_col % what column the data is in
@@ -186,7 +190,7 @@ methods
         total_seg = obj.size_data(1) * obj.num_seg;
 
         obj.entry_and_seg_id = zeros(total_seg, 2);
-        obj.quality_arr = zeros(total_seg, 5);
+        obj.quality_arr = zeros(total_seg, 6);
 
         obj.SEG_min_max = zeros(obj.size_data(1) * obj.num_seg, 2); %variable to store location of min and max with data id
         filtered = zeros(obj.size_data); %Create matrix to store filtered PPG 
@@ -276,10 +280,10 @@ methods
         obj.fiducial = struct('OnSpDnDpOff_value', NaN(obj.size_data(1),5), 'uxvw_value', NaN(obj.size_data(1),4), ...
                               'abcdef_value', NaN(obj.size_data(1),6), 'OnSpDnDpOff_index', NaN(obj.size_data(1),5), ...
                               'uxvw_index', NaN(obj.size_data(1),4), 'abcdef_index', NaN(obj.size_data(1),6));
-        obj.feature = struct('total', NaN(total_seg,147), 'fiducial_value', NaN(total_seg,15), 'fiducial_time', NaN(total_seg,15), ...
-                                'timespan', NaN(total_seg,23), 'amplitude', NaN(total_seg,14), ...
+        obj.feature = struct('total', NaN(total_seg,145), 'fiducial_value', NaN(total_seg,15), 'fiducial_time', NaN(total_seg,15), ...
+                                'timespan', NaN(total_seg,22), 'amplitude', NaN(total_seg,14), ...
                                 'vpg_apg', NaN(total_seg,12), 'waveform_area', NaN(total_seg,4), ...
-                                'power_area', NaN(total_seg,15), 'ratio', NaN(total_seg,33), 'slope', NaN(total_seg,16));
+                                'power_area', NaN(total_seg,15), 'ratio', NaN(total_seg,32), 'slope', NaN(total_seg,16));
 
         obj.c_d_APG = zeros(total_seg, 1);
 
@@ -348,7 +352,14 @@ methods
             if (strcmp(obj.dir_ext, '.mat'))
                 col_arr = fieldnames(first_file);
             else
-                col_arr = first_file.colheaders;
+                if isfield(first_file, 'colheaders')
+                    col_arr = first_file.colheaders;
+                elseif isfield(first_file, 'textdata')
+                    col_arr = first_file.textdata(1, :);
+                else
+                    res = false;
+                    return
+                end
             end
             if (size(col_arr) == 1)
                 obj.data_col = 1;
@@ -384,14 +395,14 @@ methods
         obj.fiducial = struct('OnSpDnDpOff_value', NaN(obj.size_data(1),5), 'uxvw_value', NaN(obj.size_data(1),4), ...
                               'abcdef_value', NaN(obj.size_data(1),6), 'OnSpDnDpOff_index', NaN(obj.size_data(1),5), ...
                               'uxvw_index', NaN(obj.size_data(1),4), 'abcdef_index', NaN(obj.size_data(1),6));
-        obj.feature = struct('total', NaN(obj.size_data(1),147), 'fiducial_value', NaN(obj.size_data(1),15), 'fiducial_time', NaN(obj.size_data(1),15), ...
-                                'timespan', NaN(obj.size_data(1),23), 'amplitude', NaN(obj.size_data(1),14), ...
+        obj.feature = struct('total', NaN(obj.size_data(1),145), 'fiducial_value', NaN(obj.size_data(1),15), 'fiducial_time', NaN(obj.size_data(1),15), ...
+                                'timespan', NaN(obj.size_data(1),22), 'amplitude', NaN(obj.size_data(1),14), ...
                                 'vpg_apg', NaN(obj.size_data(1),12), 'waveform_area', NaN(obj.size_data(1),4), ...
-                                'power_area', NaN(obj.size_data(1),15), 'ratio', NaN(obj.size_data(1),33), 'slope', NaN(obj.size_data(1),16));
+                                'power_area', NaN(obj.size_data(1),15), 'ratio', NaN(obj.size_data(1),32), 'slope', NaN(obj.size_data(1),16));
         
         obj.c_d_APG = zeros(obj.size_data(1), 1);
         obj.entry_and_seg_id = zeros(obj.size_data(1), 2);
-        obj.quality_arr = zeros(obj.size_data(1), 5);
+        obj.quality_arr = zeros(obj.size_data(1), 6);
 
         % Create empty Ssqi values
         A = ones(1,1);
@@ -465,13 +476,13 @@ methods
         end
     end
 
-    function [start_idx, end_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality] = FindBestCycle(obj)
+    function [start_idx, end_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality, seg_quality] = FindBestCycle(obj)
         [start_index, end_index, peak_index] = obj.FindCycles();
         %[ecg_max, ecg_min] = obj.FindSegMaxMin();
 
         %index_ECG_max = find(ecg_max);
 
-        [cycle_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
+        [cycle_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
 
 
         if isnan(cycle_idx)
@@ -480,7 +491,7 @@ methods
             return
         end
 
-        obj.quality_arr(obj.total_seg_idx, :) = [corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality];
+        obj.quality_arr(obj.total_seg_idx, :) = [corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality, seg_quality];
 
         start_idx = start_index(cycle_idx);
         end_idx = end_index(cycle_idx);
@@ -752,14 +763,14 @@ methods
                                       'index_w', 'index_a', 'index_b', 'index_c', 'index_d', 'index_e', 'index_f'});
 
         %save total feature table
-        obj.feature.total = resize(obj.feature.total, [obj.total_seg_idx 147]);
+        obj.feature.total = resize(obj.feature.total, [obj.total_seg_idx 145]);
         %feature_table = array2table(obj.feature.total, 'VariableNames', {'val_on', 'val_sp', 'val_dn', 'val_dp', 'val_off', 'val_u', 'val_x', 'val_v', 'val_w', 'val_a', 'val_b', 'val_c', 'val_d', 'val_e', 'val_f', 'time_on', 'time_sp', 'time_dn', 'time_dp', 'time_off', 'time_u', 'time_x', 'time_v', 'time_w', 'time_a', 'time_b', 'time_c', 'time_d', 'time_e', 'time_f', 'ts_on_sp', 'ts_on_dn', 'ts_on_dp', 'ts_on_u', 'ts_on_v', 'ts_on_a', 'ts_on_b', 'ts_on_c', 'ts_u_next_u', 'ts_sp_c', 'ts_sp_d', 'ts_sp_e', 'ts_sp_dp', 'ts_dn_dp', 'Tm_bb2', 'ts_b_c', 'ts_b_d', 'ts_u_sp', 'ts_u_w', 'ts_u_b', 'ts_u_c', 'ts_u_d', 'ts_a_c', 'am_on_sp', 'am_on_dn', 'am_on_dp', 'am_on_u', 'am_on_v', 'am_on_a', 'am_on_b', 'am_on_c', 'am_on_off', 'am_dn_sp', 'ar_on_dn__on_sp', 'ar_on_dp__on_sp', 'ar_dn_sp__on_sp', 'ar_dp_sp__on_sp', 'val_vpg_c', 'val_vpg_d', 'r_w_u', 'r_v_u', 'r_val_vpg_c__u', 'r_val_vpg_d__u', 'r_b_a', 'r_c_a', 'r_d_a', 'r_e_a', 'r_bcde_a', 'r_bcd_a', 'wa_on_off', 'wa_on_sp', 'wa_on_c', 'wa_on_dn', 'pa_on_sp_ppg', 'pa_u_sp_ppg', 'pa_sp_c_ppg', 'pa_sp_d_ppg', 'pa_on_sp_vpg', 'pa_u_sp_vpg', 'pa_sp_c_vpg', 'pa_sp_d_vpg', 'pa_on_sp_apg', 'pa_u_sp_apg', 'pa_sp_c_apg', 'pa_sp_d_apg', 'pa_on_off_ppg', 'pa_on_off_vpg', 'pa_on_off_apg', 'r_ts_on_a__ts_u_next_u', 'r_ts_on_u__ts_u_next_u', 'r_ts_on_b__ts_u_next_u', 'r_ts_on_sp__ts_u_next_u', 'r_ts_on_c__ts_u_next_u', 'r_ts_on_v__ts_u_next_u', 'r_ts_on_dn__ts_u_next_u', 'r_ts_u_w__ts_u_next_u', 'r_ts_sp_dp__ts_u_next_u', 'r_Tm_bb2_Tss', 'r_am_on_a__am_on_sp', 'r_am_on_u__am_on_sp', 'r_am_on_b__am_on_sp', 'r_am_on_c__am_on_sp', 'r_am_on_v__am_on_sp', 'r_am_on_off__am_on_sp', 'r_wa_dn_off__wa_on_dn', 'r_sp_on', 'r_wa_on_sp__wa_on_off', 'r_wa_on_c__wa_on_off', 'r_wa_on_dn__wa_on_off', 'r_pa_on_sp_ppg__pa_on_off_ppg', 'r_pa_u_sp_ppg__pa_on_off_ppg', 'r_pa_sp_c_ppg__pa_on_off_ppg', 'r_pa_sp_d_ppg__pa_on_off_ppg', 'r_pa_on_sp_vpg__pa_on_off_vpg', 'r_pa_u_sp_vpg__pa_on_off_vpg', 'r_pa_sp_c_vpg__pa_on_off_vpg', 'r_pa_sp_d_vpg__pa_on_off_vpg', 'r_pa_on_sp_apg__pa_on_off_apg', 'r_pa_u_sp_apg__pa_on_off_apg', 'r_pa_sp_c_apg__pa_on_off_apg', 'r_pa_sp_d_apg__pa_on_off_apg', 's_sp_c_ppg', 's_sp_d_ppg', 's_b_sp_ppg', 's_b_c_ppg', 's_b_d_ppg', 's_u_sp_ppg', 's_on_sp_ppg', 's_a_b_ppg', 's_a_b_apg', 's_b_sp_apg', 's_b_c_apg', 's_b_d_apg', 's_b_e_apg', 's_sp_c_apg', 's_u_sp_apg', 's_on_sp_apg'});
         feature_table = array2table(obj.feature.total, 'VariableNames', {'val_on', 'val_sp', 'val_dn', 'val_dp', 'val_off', 'val_u', ...
                          'val_x', 'val_v', 'val_w', 'val_a', 'val_b', 'val_c', 'val_d', 'val_e', 'val_f', 'time_on', ...
                          'time_sp', 'time_dn', 'time_dp', 'time_off', 'time_u', 'time_x', 'time_v', 'time_w', 'time_a', ...
                          'time_b', 'time_c', 'time_d', 'time_e', 'time_f', 'ts_on_sp', 'ts_on_dn', 'ts_on_dp', 'ts_on_u', ...
                          'ts_on_v', 'ts_on_a', 'ts_on_b', 'ts_on_c', 'ts_u_next_u', 'ts_sp_c', 'ts_sp_d', 'ts_sp_e', 'ts_sp_dp', ...
-                         'ts_dn_dp', 'Tm_bb2', 'ts_b_c', 'ts_b_d', 'ts_u_sp', 'ts_u_w', 'ts_u_b', 'ts_u_c', 'ts_u_d', 'ts_a_c', ...
+                         'ts_dn_dp', 'ts_b_c', 'ts_b_d', 'ts_u_sp', 'ts_u_w', 'ts_u_b', 'ts_u_c', 'ts_u_d', 'ts_a_c', ...
                          'am_on_sp', 'am_on_dn', 'am_on_dp', 'am_on_u', 'am_on_v', 'am_on_a', 'am_on_b', 'am_on_c', 'am_on_off', ...
                          'am_dn_sp', 'ar_on_dn__on_sp', 'ar_on_dp__on_sp', 'ar_dn_sp__on_sp', 'ar_dp_sp__on_sp', 'val_vpg_c', ...
                          'val_vpg_d', 'r_w_u', 'r_v_u', 'r_val_vpg_c__u', 'r_val_vpg_d__u', 'r_b_a', 'r_c_a', 'r_d_a', 'r_e_a', ...
@@ -768,7 +779,7 @@ methods
                          'pa_u_sp_apg', 'pa_sp_c_apg', 'pa_sp_d_apg', 'pa_on_off_ppg', 'pa_on_off_vpg', 'pa_on_off_apg', ...
                          'r_ts_on_a__ts_u_next_u', 'r_ts_on_u__ts_u_next_u', 'r_ts_on_b__ts_u_next_u', 'r_ts_on_sp__ts_u_next_u', ...
                          'r_ts_on_c__ts_u_next_u', 'r_ts_on_v__ts_u_next_u', 'r_ts_on_dn__ts_u_next_u', 'r_ts_u_w__ts_u_next_u', ...
-                         'r_ts_sp_dp__ts_u_next_u', 'r_Tm_bb2_Tss', 'r_am_on_a__am_on_sp', 'r_am_on_u__am_on_sp', ...
+                         'r_ts_sp_dp__ts_u_next_u', 'r_am_on_a__am_on_sp', 'r_am_on_u__am_on_sp', ...
                          'r_am_on_b__am_on_sp', 'r_am_on_c__am_on_sp', 'r_am_on_v__am_on_sp', 'r_am_on_off__am_on_sp', ...
                          'r_wa_dn_off__wa_on_dn', 'r_sp_on', 'r_wa_on_sp__wa_on_off', 'r_wa_on_c__wa_on_off', 'r_wa_on_dn__wa_on_off', ...
                          'r_pa_on_sp_ppg__pa_on_off_ppg', 'r_pa_u_sp_ppg__pa_on_off_ppg', 'r_pa_sp_c_ppg__pa_on_off_ppg', ...
@@ -789,11 +800,11 @@ methods
         % c and d presence in segment
         obj.c_d_APG = resize(obj.c_d_APG, [obj.total_seg_idx 1]);
 
-        obj.quality_arr = resize(obj.quality_arr, [obj.total_seg_idx 5]);
+        obj.quality_arr = resize(obj.quality_arr, [obj.total_seg_idx 6]);
 
         info_table = array2table([obj.entry_and_seg_id obj.SEG_min_max obj.c_d_APG obj.quality_arr], ...
                                  'VariableNames', {'entry_id', 'segment_id', 'min_1', 'min_2', 'c_d_pres', ...
-                                                   'corr_qual', 'skew_qual', 'seg_corr_qual', 'seg_skew_qual', 'comb_qual'});
+                                                   'corr_qual', 'skew_qual', 'seg_corr_qual', 'seg_skew_qual', 'cycle_qual', 'seg_qual'});
 
         if if_mat
             save('PPG_Results_' + date_string, 'fiducial_table', 'feature_table', 'info_table')
@@ -903,15 +914,15 @@ methods (Access = private)
             old_feature = obj.feature;
             old_feature_size = size(obj.feature.total);
 
-            obj.feature.total = NaN(obj.size_data(1), 147);
+            obj.feature.total = NaN(obj.size_data(1), 145);
             obj.feature.fiducial_value = NaN(obj.size_data(1), 15);
             obj.feature.fiducial_time = NaN(obj.size_data(1), 15);
-            obj.feature.timespan = NaN(obj.size_data(1), 23);
+            obj.feature.timespan = NaN(obj.size_data(1), 22);
             obj.feature.amplitude = NaN(obj.size_data(1), 14);
             obj.feature.vpg_apg = NaN(obj.size_data(1), 12);
             obj.feature.waveform_area = NaN(obj.size_data(1), 4);
             obj.feature.power_area = NaN(obj.size_data(1), 15);
-            obj.feature.ratio = NaN(obj.size_data(1), 33);
+            obj.feature.ratio = NaN(obj.size_data(1), 32);
             obj.feature.slope = NaN(obj.size_data(1), 16);
 
             obj.feature.total(1:old_feature_size(1), :) = old_feature.total;
@@ -927,7 +938,7 @@ methods (Access = private)
 
             obj.c_d_APG = resize(obj.c_d_APG, [obj.size_data(1) 1]);
             obj.entry_and_seg_id = resize(obj.entry_and_seg_id, [obj.size_data(1) 2]);
-            obj.quality_arr = resize(obj.quality_arr, [obj.size_data(1) 5]);
+            obj.quality_arr = resize(obj.quality_arr, [obj.size_data(1) 6]);
         end
 
         %Create Filter 

@@ -64,7 +64,7 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     ts_dn_dp = (time_dp - time_dn) * sample_time;
 
     % Need to ask about this, if I understood correctly, needs next cycle to calculate
-    Tm_bb2 = 0;
+    %Tm_bb2 = 0;
 
     ts_b_c = (time_c - time_b) * sample_time;
     ts_b_d = (time_d - time_b) * sample_time;
@@ -91,15 +91,15 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     feature.timespan(12) = ts_sp_e;
     feature.timespan(13) = ts_sp_dp;
     feature.timespan(14) = ts_dn_dp;
-    feature.timespan(15) = Tm_bb2;
-    feature.timespan(16) = ts_b_c;
-    feature.timespan(17) = ts_b_d;
-    feature.timespan(18) = ts_u_sp;
-    feature.timespan(19) = ts_u_w;
-    feature.timespan(20) = ts_u_b;
-    feature.timespan(21) = ts_u_c;
-    feature.timespan(22) = ts_u_d;
-    feature.timespan(23) = ts_a_c;
+    %feature.timespan(15) = Tm_bb2;
+    feature.timespan(15) = ts_b_c;
+    feature.timespan(16) = ts_b_d;
+    feature.timespan(17) = ts_u_sp;
+    feature.timespan(18) = ts_u_w;
+    feature.timespan(19) = ts_u_b;
+    feature.timespan(20) = ts_u_c;
+    feature.timespan(21) = ts_u_d;
+    feature.timespan(22) = ts_a_c;
 
     % am means amplitude
     am_on_sp = val_sp - val_on;
@@ -251,7 +251,7 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     r_ts_on_dn__ts_u_next_u = ts_on_dn / ts_u_next_u;
     r_ts_u_w__ts_u_next_u = ts_u_w / ts_u_next_u;
     r_ts_sp_dp__ts_u_next_u = ts_sp_dp / ts_u_next_u;
-    r_Tm_bb2_Tss = 0; % Needs future b (Tm_bb2)
+    %r_Tm_bb2_Tss = 0; % Needs future b (Tm_bb2)
 
     r_am_on_a__am_on_sp = am_on_a / am_on_sp;
     r_am_on_u__am_on_sp = am_on_u / am_on_sp;
@@ -294,30 +294,30 @@ function [feature] = CalcFeatures(OnSpDnDpOff, uxvw, next_u, abcdef, OnSpDnDpOff
     feature.ratio(7) = r_ts_on_dn__ts_u_next_u;
     feature.ratio(8) = r_ts_u_w__ts_u_next_u;
     feature.ratio(9) = r_ts_sp_dp__ts_u_next_u;
-    feature.ratio(10) = r_Tm_bb2_Tss;
-    feature.ratio(11) = r_am_on_a__am_on_sp;
-    feature.ratio(12) = r_am_on_u__am_on_sp;
-    feature.ratio(13) = r_am_on_b__am_on_sp;
-    feature.ratio(14) = r_am_on_c__am_on_sp;
-    feature.ratio(15) = r_am_on_v__am_on_sp;
-    feature.ratio(16) = r_am_on_off__am_on_sp;
-    feature.ratio(17) = r_wa_dn_off__wa_on_dn;
-    feature.ratio(18) = r_sp_on;
-    feature.ratio(19) = r_wa_on_sp__wa_on_off;
-    feature.ratio(20) = r_wa_on_c__wa_on_off;
-    feature.ratio(21) = r_wa_on_dn__wa_on_off;
-    feature.ratio(22) = r_pa_on_sp_ppg__pa_on_off_ppg;
-    feature.ratio(23) = r_pa_u_sp_ppg__pa_on_off_ppg;
-    feature.ratio(24) = r_pa_sp_c_ppg__pa_on_off_ppg;
-    feature.ratio(25) = r_pa_sp_d_ppg__pa_on_off_ppg;
-    feature.ratio(26) = r_pa_on_sp_vpg__pa_on_off_vpg;
-    feature.ratio(27) = r_pa_u_sp_vpg__pa_on_off_vpg;
-    feature.ratio(28) = r_pa_sp_c_vpg__pa_on_off_vpg;
-    feature.ratio(29) = r_pa_sp_d_vpg__pa_on_off_vpg;
-    feature.ratio(30) = r_pa_on_sp_apg__pa_on_off_apg;
-    feature.ratio(31) = r_pa_u_sp_apg__pa_on_off_apg;
-    feature.ratio(32) = r_pa_sp_c_apg__pa_on_off_apg;
-    feature.ratio(33) = r_pa_sp_d_apg__pa_on_off_apg;
+    %feature.ratio(10) = r_Tm_bb2_Tss;
+    feature.ratio(10) = r_am_on_a__am_on_sp;
+    feature.ratio(11) = r_am_on_u__am_on_sp;
+    feature.ratio(12) = r_am_on_b__am_on_sp;
+    feature.ratio(13) = r_am_on_c__am_on_sp;
+    feature.ratio(14) = r_am_on_v__am_on_sp;
+    feature.ratio(15) = r_am_on_off__am_on_sp;
+    feature.ratio(16) = r_wa_dn_off__wa_on_dn;
+    feature.ratio(17) = r_sp_on;
+    feature.ratio(18) = r_wa_on_sp__wa_on_off;
+    feature.ratio(19) = r_wa_on_c__wa_on_off;
+    feature.ratio(20) = r_wa_on_dn__wa_on_off;
+    feature.ratio(21) = r_pa_on_sp_ppg__pa_on_off_ppg;
+    feature.ratio(22) = r_pa_u_sp_ppg__pa_on_off_ppg;
+    feature.ratio(23) = r_pa_sp_c_ppg__pa_on_off_ppg;
+    feature.ratio(24) = r_pa_sp_d_ppg__pa_on_off_ppg;
+    feature.ratio(25) = r_pa_on_sp_vpg__pa_on_off_vpg;
+    feature.ratio(26) = r_pa_u_sp_vpg__pa_on_off_vpg;
+    feature.ratio(27) = r_pa_sp_c_vpg__pa_on_off_vpg;
+    feature.ratio(28) = r_pa_sp_d_vpg__pa_on_off_vpg;
+    feature.ratio(29) = r_pa_on_sp_apg__pa_on_off_apg;
+    feature.ratio(30) = r_pa_u_sp_apg__pa_on_off_apg;
+    feature.ratio(31) = r_pa_sp_c_apg__pa_on_off_apg;
+    feature.ratio(32) = r_pa_sp_d_apg__pa_on_off_apg;
 
     % s means slope
 

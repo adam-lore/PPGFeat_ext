@@ -1,4 +1,4 @@
-function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality, quality] = CalcBestCycle(start_index, end_index, peak_index, RFs, PPG)
+function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality, quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, RFs, PPG)
     % How many cycles at the start/end to cut off
     start_buffer = 0;
     end_buffer = 0;
@@ -13,6 +13,7 @@ function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality,
     skew_quality = NaN;
     seg_corr_quality = NaN;
     seg_skew_quality = NaN;
+    seg_quality = NaN;
 
     seg_len = length(PPG);
 
@@ -74,7 +75,11 @@ function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality,
         mean_cycle = mean(centered_cycles);
     end
 
-    
+    %corr_w = 2/3;
+    %skew_w = 1/3;
+
+    corr_w = 0.8;
+    skew_w = 0.2;
     
     for i = 1 + start_buffer:num_cycle - end_buffer
         
@@ -106,24 +111,46 @@ function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality,
         skew_quality = skewness(PPG(p1:p2));
         skew_sum = skew_sum + skew_quality;
 
-        if skew_quality > 1
-            skew_quality = 1;
+        if skew_quality > 0.75
+            skew_quality = 0.75;
         end
 
-        if (corr_quality + (0.5* skew_quality)) > quality || isnan(quality)
+        if (corr_w * corr_quality + skew_w * skew_quality) > quality || isnan(quality)
         %if isnan(quality)
             index = i;
-            quality = (corr_quality * (skew_quality / 2));
+            %quality = (corr_quality * (skew_quality / 2));
+            quality = (corr_w * corr_quality + skew_w * skew_quality);
             max_corr_quality = corr_quality;
             max_skew_quality = skew_quality;
         end
     end
+
+    %skew_sum = 0;
+    %start_window = 1;
+    %end_window = 0;
+    %window_count = 0;
+
+    %while end_window < seg_len
+    %    end_window = start_window + ceil(3 * RFs);
+    %
+    %    if end_window > seg_len
+    %        end_window = seg_len;
+    %    end
+
+    %    skew_quality = skewness(PPG(start_window:end_window));
+    %    skew_sum = skew_sum + skew_quality;
+
+    %    start_window = end_window + 1;
+    %    window_count = window_count + 1;
+    %end
 
     corr_quality = max_corr_quality;
     skew_quality = max_skew_quality;
     
     seg_corr_quality = corr_sum / (num_cycle - start_buffer - end_buffer);
     seg_skew_quality = skew_sum / (num_cycle - start_buffer - end_buffer);
+    %seg_skew_quality = skew_sum / window_count;
+    seg_quality = corr_w * seg_corr_quality + skew_w * seg_skew_quality;
 
     return;
 end
