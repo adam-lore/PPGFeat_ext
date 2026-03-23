@@ -1001,20 +1001,6 @@ methods (Access = private)
     function [start_index, end_index, peak_index] = FindCycles(obj)
         [index_PPG_max, index_PPG_min] = FindSegMaxMin(obj);
 
-        %if obj.entry_idx == 12 && obj.seg_idx == 25
-        %if obj.entry_idx == 67
-        if 1 == 2
-            warning('Break reached');
-            temp = plot(obj.PPG_filtered(obj.total_seg_idx ,:));
-            for i = 1:length(index_PPG_max)
-                datatip(temp, index_PPG_max(i), obj.PPG_filtered(obj.total_seg_idx , index_PPG_max(i)),'FontSize',3)
-            end
-            for i = 1:length(index_PPG_min)
-                datatip(temp, index_PPG_min(i), obj.PPG_filtered(obj.total_seg_idx , index_PPG_min(i)),'FontSize',3)
-            end
-            warning('Break done');
-        end
-
         % Set start, end and peak index arrays to zero of size index_PPG_min
         [start_index, end_index, peak_index] = deal(zeros(size(index_PPG_min)));
 
