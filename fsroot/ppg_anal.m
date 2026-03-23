@@ -57,8 +57,6 @@ classdef ppg_anal < handle
 
     properties (Access = private)
         is_dir % wheter data is loaded from a directory or a file
-        %dir_files % to store files in directory
-        %dir_folder % to store folder name
         num_entries % number of files in directory
         dir_ext % extension of files in directory to load
         data_col % what column the data is in
@@ -90,7 +88,7 @@ methods
         obj.seg_len = seg_len;
 
         %REMEMBER TO CHANGE
-        [file, path]= uigetfile({'*.*';'*.txt';'*.csv;*.xlsx';'*.mat'}, 'Load PPG File', 'D:\Research\Examensarbete\Datasets\');  %read CVS file
+        [file, path]= uigetfile({'*.*';'*.txt';'*.csv;*.xlsx';'*.mat'}, 'Load PPG File');  %read CVS file
         if (path == 0)
             res = false;
             return
@@ -99,33 +97,33 @@ methods
         [~, ~, file_extension] = fileparts(file);
         %load all RAW data depending on file format
         switch file_extension
-            case '.txt' 
-                obj.loaded_data = importdata([path file]); 
-            case {'.csv', '.xlsx'}
-                loaded_file = importdata([path file]);
-                if ~isa(loaded_file, 'struct')
-                    obj.loaded_data = loaded_file;
-                else
-                    obj.loaded_data = loaded_file.data;
+            case {'.csv', '.xlsx', '.txt'}
+                loaded_table = readtable([path file]);
 
-                    obj.size_data = size(obj.loaded_data); %read size of loaded data
+                size_table = size(loaded_table);
 
-                    % The data may be orientated differently when there is only one entry
-                    % (And anyone who organized each entry by column is crazy)
-                    if obj.size_data(1) > obj.size_data(2)
-                        col_arr = loaded_file.colheaders;
-                        if (size(col_arr) == 1)
-                            ppg_col = 1;
-                        else
-                            [ppg_col, tf] = listdlg('PromptString', {'Select column'}, 'SelectionMode','single', 'ListString', col_arr);
-                            if (tf == false)
-                                res = false;
-                                return
-                            end
+                % The data may be orientated differently when there is only one entry
+                % (And anyone who organized each entry by column is crazy)
+                if size_table(1) > size_table(2)
+
+                    col_arr = loaded_table.Properties.VariableNames;
+
+                    if (size(col_arr) == 1)
+                        ppg_col = 1;
+                    else
+                        [ppg_col, tf] = listdlg('PromptString', {'Select column'}, 'SelectionMode','single', 'ListString', col_arr);
+                        if (tf == false)
+                            res = false;
+                            return
                         end
-                        obj.loaded_data = rot90(obj.loaded_data(:, ppg_col));
                     end
+                    temp_data = loaded_table.Variables;
+
+                    obj.loaded_data = rot90(temp_data(:, ppg_col));
+                else
+                    obj.loaded_data = loaded_table.Variables;
                 end
+
             case '.mat'
                 loaded_struct = importdata([path file]);
 
@@ -159,18 +157,18 @@ methods
 
         % The data may be orientated differently when there is only one entry
         % (And anyone who organized each entry by column is crazy)
-        if obj.size_data(1) > obj.size_data(2)
-            obj.loaded_data = rot90(obj.loaded_data);
+        %if obj.size_data(1) > obj.size_data(2)
+        %    obj.loaded_data = rot90(obj.loaded_data);
 
-            [row_num, tf] = listdlg('PromptString', {'Select the column with PPG data'}, ...
-                                        'SelectionMode', 'single', 'ListString', string(1:obj.size_data(2)));
-            if (tf == false)
-                res = false;
-                return
-            end
-            obj.loaded_data = obj.loaded_data(row_num, :);
-            obj.size_data = size(obj.loaded_data);
-        end
+        %    [row_num, tf] = listdlg('PromptString', {'Select the column with PPG data'}, ...
+        %                                'SelectionMode', 'single', 'ListString', string(1:obj.size_data(2)));
+        %    if (tf == false)
+        %        res = false;
+        %        return
+        %    end
+        %    obj.loaded_data = obj.loaded_data(row_num, :);
+        %    obj.size_data = size(obj.loaded_data);
+        %end
 
         obj.num_entries = obj.size_data(1);
 
@@ -316,8 +314,7 @@ methods
         obj.is_seg = is_seg;
         obj.seg_len = seg_len;
 
-        %REMEMBER TO CHANGE
-        path = uigetdir('D:\Research\Examensarbete\Datasets');  %read CVS file
+        path = uigetdir();  %read CVS file
         if (path == 0)
             res = false;
             return
@@ -346,28 +343,36 @@ methods
             return
         end
 
-        first_file = importdata(strjoin([obj.dir_folder '\' obj.dir_files(1)], ''));
+        switch obj.dir_ext
+            case {'.csv', '.xlsx', '.txt'}
+                first_table = readtable(strjoin([obj.dir_folder '\' obj.dir_files(1)], ''));
 
-        if (isa(first_file, 'struct'))
-            if (strcmp(obj.dir_ext, '.mat'))
-                col_arr = fieldnames(first_file);
-            else
-                if isfield(first_file, 'colheaders')
-                    col_arr = first_file.colheaders;
-                elseif isfield(first_file, 'textdata')
-                    col_arr = first_file.textdata(1, :);
+                table_size = size(first_table);
+
+                if (table_size(1) > table_size(2))
+                    col_arr = first_table.Properties.VariableNames;
                 else
-                    res = false;
-                    return
+                    col_arr = [];
                 end
-            end
-            if (size(col_arr) == 1)
-                obj.data_col = 1;
-            else
-                [obj.data_col, tf] = listdlg('PromptString', {'Select column'}, 'SelectionMode','single', 'ListString', col_arr);
-            end
+            case '.mat'
+                first_mfile = importdata(strjoin([obj.dir_folder '\' obj.dir_files(1)], ''));
+                if (isa(first_mfile, 'struct'))
+                    col_arr = fieldnames(first_mfile);
+                else
+                    col_arr = [];
+                end
+            otherwise
+                res = false;
+                return
         end
-        
+
+        if (size(col_arr) == 0)
+            obj.data_col = 0;  
+        elseif (size(col_arr) == 1)
+            obj.data_col = 1;
+        else
+            [obj.data_col, tf] = listdlg('PromptString', {'Select column'}, 'SelectionMode','single', 'ListString', col_arr);
+        end  
 
         if (tf == false)
             res = false;
@@ -418,8 +423,7 @@ methods
     end
 
     function LoadSsqi(obj)
-        %REMEMBER TO CHANGE
-        [file1,path1]= uigetfile('D:\Research\Examensarbete\Datasets\*.csv');
+        [file1,path1]= uigetfile();
         obj.Ssqi= importdata([path1 file1]);
     end
 
@@ -841,12 +845,11 @@ methods (Access = private)
     function LoadFile(obj)
         filepath = strjoin([obj.dir_folder '\' obj.dir_files(obj.entry_idx)], '');
 
-        
-        obj.loaded_data = importdata(filepath);
-
-        if (isa(obj.loaded_data, 'struct'))
-
-            if (strcmp(obj.dir_ext, '.mat'))
+        if (strcmp(obj.dir_ext, '.mat'))
+            obj.loaded_data = importdata(filepath);
+            if (obj.data_col == 0)
+                obj.loaded_data = rot90(obj.loaded_data);
+            else
                 mat_var_arr = who('-file', filepath);
                 mat_var = mat_var_arr{obj.data_col};
                 obj.loaded_data = load(filepath, mat_var);
@@ -857,13 +860,14 @@ methods (Access = private)
                 else
                     obj.loaded_data = rot90(obj.loaded_data);
                 end
-
-            else
-                obj.loaded_data = rot90(obj.loaded_data.data(:, obj.data_col));
             end
         else
-            if (~strcmp(obj.dir_ext, '.txt'))
-                obj.loaded_data = rot90(obj.loaded_data);
+            obj.loaded_data = readtable(filepath);
+            if (obj.data_col == 0)
+                obj.loaded_data = obj.loaded_data.Variables;
+            else
+                obj.loaded_data = obj.loaded_data(:, obj.data_col);
+                obj.loaded_data = rot90(obj.loaded_data.Variables);
             end
         end
 
