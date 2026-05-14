@@ -66,7 +66,7 @@ classdef ppg_anal < handle
   
 methods
     function obj = ppg_anal()
-        addpath('fsroot/functions');
+        %addpath('./fsroot/functions');
     end
 
     function res = LoadPPG(obj, OFs, RFs, FL, FH, is_seg, seg_len)
