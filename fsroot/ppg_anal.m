@@ -65,6 +65,11 @@ classdef ppg_anal < handle
     end
   
 methods
+    function obj = ppg_anal()
+        %add function folder to path
+        addpath(fullfile(fileparts(which("ppg_anal")), 'functions'));
+    end
+
     function res = LoadPPG(obj, OFs, RFs, FL, FH, is_seg, seg_len)
         %data is loaded from file
         obj.is_dir = false;
