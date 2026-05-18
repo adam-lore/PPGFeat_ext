@@ -315,7 +315,7 @@ methods
         obj.is_seg = is_seg;
         obj.seg_len = seg_len;
 
-        path = uigetdir();  %read CVS file
+        path = uigetdir();
         if (path == 0)
             res = false;
             return
@@ -736,22 +736,6 @@ methods
 
         date_string = string(datetime, 'MM-dd_HH-mm');
 
-        %save segmented data of PPG for zero padded values
-        %arr_size = size(obj.PPG_SEG);
-        %obj.PPG_SEG = resize(obj.PPG_SEG, [obj.total_seg_idx arr_size(2)]);
-        %writematrix(obj.PPG_SEG, 'PPG_Segments.xlsx')
-        %PPG = obj.PPG_SEG;
-
-        %save segmented data of APG for zero padded values
-        %arr_size = size(obj.APG_SEG);
-        %obj.APG_SEG = resize(obj.APG_SEG, [obj.total_seg_idx arr_size(2)]);
-        %writematrix(obj.APG_SEG, 'APG_Segments.xlsx')
-        %APG_s = obj.APG_SEG;
-
-        %save filtered data of the whole input PPG 219 x 2100
-        %writematrix(obj.PPG_filtered, 'PPG_Filtered_HighSQI.xlsx')
-        %PPG_fil = obj.PPG_filtered;
-
         %save fiducial table
         obj.fiducial.OnSpDnDpOff_value = resize(obj.fiducial.OnSpDnDpOff_value, [obj.total_seg_idx 5]);
         obj.fiducial.uxvw_value = resize(obj.fiducial.uxvw_value, [obj.total_seg_idx 4]);
@@ -812,11 +796,15 @@ methods
                                                    'corr_qual', 'skew_qual', 'seg_corr_qual', 'seg_skew_qual', 'cycle_qual', 'seg_qual'});
 
         if if_mat
-            save('PPG_Results_' + date_string, 'fiducial_table', 'feature_table', 'info_table')
+            uisave({'fiducial_table', 'feature_table', 'info_table'}, 'PPG_Results_' + date_string)
         else
-            writetable(fiducial_table, 'PPG_fiducials_' + date_string + '.xlsx', WriteMode='overwrite');
-            writetable(feature_table, 'PPG_features_' + date_string + '.xlsx', WriteMode='overwrite')
-            writetable(info_table, 'PPG_info_' + date_string + '.xlsx', WriteMode='overwrite');
+            saveDir = uigetdir('', 'Select folder to save results');
+
+            if saveDir ~= 0
+                writetable(fiducial_table, string(saveDir) + '\PPG_fiducials_' + date_string + '.xlsx', WriteMode='overwrite');
+                writetable(feature_table, string(saveDir) + '\PPG_features_' + date_string + '.xlsx', WriteMode='overwrite')
+                writetable(info_table, string(saveDir) + '\PPG_info_' + date_string + '.xlsx', WriteMode='overwrite');
+            end
         end
 
         
