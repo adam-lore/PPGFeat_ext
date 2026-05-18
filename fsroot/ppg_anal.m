@@ -8,6 +8,7 @@ classdef ppg_anal < handle
         entry_idx % index of current entry
         seg_idx % index of current segment in entry
         total_seg_idx % index of current segment
+        num_entries % number of files in directory
         Ssqi % Description
         Sub_ID % Description
         PPG_filtered % Description
@@ -57,7 +58,6 @@ classdef ppg_anal < handle
 
     properties (Access = private)
         is_dir % wheter data is loaded from a directory or a file
-        num_entries % number of files in directory
         dir_ext % extension of files in directory to load
         data_col % what column the data is in
         filter_sos % filter 
