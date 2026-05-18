@@ -541,7 +541,7 @@ methods
         obj.feature.waveform_area(obj.total_seg_idx,:) = feature_struct.waveform_area;
         obj.feature.ratio(obj.total_seg_idx,:) = feature_struct.ratio;
 
-        if anynan(obj.feature.total)
+        if anynan(obj.feature.total(obj.total_seg_idx,:))
             res = false;
         else
             res = true;
