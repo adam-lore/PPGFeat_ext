@@ -27,6 +27,7 @@ classdef ppg_anal < handle
         FH %filter high freq
         is_seg %if entries should be divided into smaller segments
         seg_len %max length of segments (ms)
+        invert %whether to invert the signal or not
         num_seg %number of segments each entry is divided into
         T2_5 %2.5 % of total length of selected segment
 
@@ -70,7 +71,7 @@ methods
         addpath(fullfile(fileparts(which("ppg_anal")), 'functions'));
     end
 
-    function res = LoadPPG(obj, OFs, RFs, FL, FH, is_seg, seg_len)
+    function res = LoadPPG(obj, OFs, RFs, FL, FH, is_seg, seg_len, invert)
         %data is loaded from file
         obj.is_dir = false;
 
@@ -87,8 +88,7 @@ methods
         obj.FH = FH;
         obj.is_seg = is_seg;
         obj.seg_len = seg_len;
-
-        %REMEMBER TO CHANGE
+        obj.invert = invert;
         [file, path]= uigetfile({'*.*';'*.txt';'*.csv;*.xlsx';'*.mat'}, 'Load PPG File');  %read CVS file
         if (path == 0)
             res = false;
@@ -118,11 +118,9 @@ methods
                             return
                         end
                     end
-                    temp_data = loaded_table.Variables;
-
-                    obj.loaded_data = rot90(temp_data(:, ppg_col));
+                    obj.loaded_data = rot90(loaded_table{:, ppg_col});
                 else
-                    obj.loaded_data = loaded_table.Variables;
+                    obj.loaded_data = loaded_table{:, :};
                 end
 
             case '.mat'
@@ -152,6 +150,10 @@ methods
             otherwise
                 res = false;
                 return
+        end
+
+        if (obj.invert)
+            obj.loaded_data = -obj.loaded_data;
         end
 
         obj.size_data = size(obj.loaded_data); %read size of loaded data
@@ -297,7 +299,7 @@ methods
         res = true;
     end
 
-    function res = LoadDirectory(obj, OFs, RFs, FL, FH, is_seg, seg_len)
+    function res = LoadDirectory(obj, OFs, RFs, FL, FH, is_seg, seg_len, invert)
         %data is loaded from directory
         obj.is_dir = true;
 
@@ -314,6 +316,7 @@ methods
         obj.FH = FH;
         obj.is_seg = is_seg;
         obj.seg_len = seg_len;
+        obj.invert = invert;
 
         path = uigetdir();
         if (path == 0)
@@ -862,6 +865,10 @@ methods (Access = private)
 
         if (anynan(obj.loaded_data))
             obj.loaded_data(isnan(obj.loaded_data)) = 0; %replace NaN with 0
+        end
+
+        if obj.invert
+            obj.loaded_data = -obj.loaded_data; %invert signal if needed
         end
 
         size_file = size(obj.loaded_data);
