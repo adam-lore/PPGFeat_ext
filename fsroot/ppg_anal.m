@@ -89,13 +89,13 @@ methods
         obj.is_seg = is_seg;
         obj.seg_len = seg_len;
         obj.invert = invert;
-        [file, path]= uigetfile({'*.*';'*.txt';'*.csv;*.xlsx';'*.mat'}, 'Load PPG File');  %read CVS file
+        [file, path]= uigetfile({'*.*';'*.csv;*.xlsx';'*.hea';'*.mat';'*.txt'}, 'Load PPG File');  %read CVS file
         if (path == 0)
             res = false;
             return
         end
 
-        [~, ~, file_extension] = fileparts(file);
+        [~, file_name, file_extension] = fileparts(file);
         %load all RAW data depending on file format
         switch file_extension
             case {'.csv', '.xlsx', '.txt'}
@@ -122,6 +122,26 @@ methods
                 else
                     obj.loaded_data = loaded_table{:, :};
                 end
+
+            case '.hea'
+                cd(path);
+                %[obj.loaded_data, obj.OFs] = rdsamp([path file_name]);
+                loaded_table = rdsamp(file_name);
+                data_hea = wfdbdesc(file_name);
+
+                if (size(data_hea) == 1)
+                    ppg_channel = 1;
+                else
+                    [ppg_channel, tf] = listdlg('PromptString', {'Select channel'}, 'SelectionMode','single', 'ListString', {data_hea.Description});
+                    if (tf == false)
+                        res = false;
+                        return
+                    end
+                end
+
+                %obj.loaded_data = rot90(loaded_table{:, ppg_channel});
+                obj.loaded_data = rot90(loaded_table(:, ppg_channel));
+                obj.OFs = double(data_hea(ppg_channel).SamplingFrequency);
 
             case '.mat'
                 loaded_struct = importdata([path file]);
@@ -323,7 +343,7 @@ methods
             res = false;
             return
         end
-        allowed_extensions = {'.mat', '.csv', '.xlsx', '.txt'};
+        allowed_extensions = {'.csv', '.xlsx', '.hea', '.mat', '.txt'};
         [idx, tf] = listdlg('PromptString', {'Select file format'}, ...
                                 'SelectionMode', 'single', 'ListString', allowed_extensions);
         if (tf == false)
@@ -358,6 +378,13 @@ methods
                 else
                     col_arr = [];
                 end
+
+            case '.hea'
+                cd(obj.dir_folder);
+                [~, file_name, ~] = fileparts(obj.dir_files(1));
+                data_hea = wfdbdesc(file_name{1});
+                col_arr = {data_hea.Description};
+
             case '.mat'
                 first_mfile = importdata(strjoin([obj.dir_folder '\' obj.dir_files(1)], ''));
                 if (isa(first_mfile, 'struct'))
@@ -365,6 +392,7 @@ methods
                 else
                     col_arr = [];
                 end
+
             otherwise
                 res = false;
                 return
@@ -381,6 +409,10 @@ methods
         if (tf == false)
             res = false;
             return
+        end
+
+        if strcmp(obj.dir_ext, '.hea')
+            obj.OFs = double(data_hea(obj.data_col).SamplingFrequency);
         end
 
         obj.SEG_min_max = zeros(obj.size_data(1), 2); %variable to store location of min and max with data id
@@ -464,7 +496,7 @@ methods
         %else
         %    segment = obj.PPG_filtered(obj.total_seg_idx ,:);
         %end
-
+        
         segment = obj.PPG_filtered(obj.total_seg_idx ,:);
         %find maxima and minima of current segment
         PPG_max = islocalmax(segment ,"MinProminence",0.5,"FlatSelection","all",...
@@ -837,30 +869,40 @@ methods (Access = private)
     function LoadFile(obj)
         filepath = strjoin([obj.dir_folder '\' obj.dir_files(obj.entry_idx)], '');
 
-        if (strcmp(obj.dir_ext, '.mat'))
-            obj.loaded_data = importdata(filepath);
-            if (obj.data_col == 0)
-                obj.loaded_data = rot90(obj.loaded_data);
-            else
-                mat_var_arr = who('-file', filepath);
-                mat_var = mat_var_arr{obj.data_col};
-                obj.loaded_data = load(filepath, mat_var);
-                obj.loaded_data = obj.loaded_data.(mat_var);
-
-                if (isa(obj.loaded_data, 'timeseries'))
-                    obj.loaded_data = rot90(obj.loaded_data.Data);
+        switch obj.dir_ext
+            case {'.csv', '.xlsx', '.txt'}
+                obj.loaded_data = readtable(filepath);
+                if (obj.data_col == 0)
+                    obj.loaded_data = obj.loaded_data.Variables;
                 else
-                    obj.loaded_data = rot90(obj.loaded_data);
+                    obj.loaded_data = obj.loaded_data(:, obj.data_col);
+                    obj.loaded_data = rot90(obj.loaded_data.Variables);
                 end
-            end
-        else
-            obj.loaded_data = readtable(filepath);
-            if (obj.data_col == 0)
-                obj.loaded_data = obj.loaded_data.Variables;
-            else
-                obj.loaded_data = obj.loaded_data(:, obj.data_col);
-                obj.loaded_data = rot90(obj.loaded_data.Variables);
-            end
+
+            case '.hea'
+                cd(obj.dir_folder);
+                %[obj.loaded_data, obj.OFs] = rdsamp([path file_name]);
+                [~, file_name, ~] = fileparts(obj.dir_files(obj.entry_idx));
+                loaded_table = rdsamp(file_name{1});
+
+                obj.loaded_data = rot90(loaded_table(:, obj.data_col));
+
+            case {'.mat'}
+                obj.loaded_data = importdata(filepath);
+                if (obj.data_col == 0)
+                    obj.loaded_data = rot90(obj.loaded_data);
+                else
+                    mat_var_arr = who('-file', filepath);
+                    mat_var = mat_var_arr{obj.data_col};
+                    obj.loaded_data = load(filepath, mat_var);
+                    obj.loaded_data = obj.loaded_data.(mat_var);
+
+                    if (isa(obj.loaded_data, 'timeseries'))
+                        obj.loaded_data = rot90(obj.loaded_data.Data);
+                    else
+                        obj.loaded_data = rot90(obj.loaded_data);
+                    end
+                end
         end
 
         if (anynan(obj.loaded_data))
@@ -957,7 +999,7 @@ methods (Access = private)
         if (obj.RFs ~= obj.OFs)
             %resample the data from OFs to RFs   
             if (obj.num_seg == 1) 
-                obj.PPG_filtered(obj.entry_idx, :) = resample(filtered(obj.entry_idx, :), obj.RFs, obj.OFs);
+                obj.PPG_filtered(obj.entry_idx, :) = resize(resample(filtered(obj.entry_idx, :), obj.RFs, obj.OFs), obj.size_data(2));
             else
                 resampled = resample(filtered(obj.entry_idx, :), obj.RFs, obj.OFs);
                 %divide entry into segments of length obj.size_data(2)
@@ -973,7 +1015,8 @@ methods (Access = private)
             end
         else
             if (obj.num_seg == 1)
-                obj.PPG_filtered = filtered;
+                %obj.PPG_filtered = filtered;
+                obj.PPG_filtered(obj.entry_idx, :) = resize(filtered(obj.entry_idx, :), obj.size_data(2));
             else
                 %divide entry into segments of length obj.size_data(2)
                 for j = 0:obj.num_seg - 1
