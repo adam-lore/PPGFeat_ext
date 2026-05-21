@@ -23,6 +23,8 @@ classdef ppg_anal < handle
         c_d_APG %to store result of c and d presence
         OFs %original sampling freq
         RFs %resampled sampling freq
+        Fs %current sampling freq (depends on resampling)
+        resample_bool %whether to resample the data or not
         FL %filter low freq
         FH %filter high freq
         is_seg %if entries should be divided into smaller segments
@@ -71,7 +73,7 @@ methods
         addpath(fullfile(fileparts(which("ppg_anal")), 'functions'));
     end
 
-    function res = LoadPPG(obj, OFs, RFs, FL, FH, is_seg, seg_len, invert)
+    function res = LoadPPG(obj, OFs, RFs, resample_bool, FL, FH, is_seg, seg_len, invert)
         %data is loaded from file
         obj.is_dir = false;
 
@@ -84,6 +86,7 @@ methods
         %set initial parameters for filter
         obj.OFs = OFs;
         obj.RFs = RFs;
+        obj.resample_bool = resample_bool;
         obj.FL = FL;
         obj.FH = FH;
         obj.is_seg = is_seg;
@@ -132,16 +135,20 @@ methods
                 if (size(data_hea) == 1)
                     ppg_channel = 1;
                 else
-                    [ppg_channel, tf] = listdlg('PromptString', {'Select channel'}, 'SelectionMode','single', 'ListString', {data_hea.Description});
+                    [ppg_channel, tf] = listdlg('PromptString', {'Select channel'}, 'SelectionMode','single', 'ListString', [{'Choose this if every option in identical'}, {data_hea.Description}]);
                     if (tf == false)
                         res = false;
                         return
                     end
                 end
 
-                %obj.loaded_data = rot90(loaded_table{:, ppg_channel});
-                obj.loaded_data = rot90(loaded_table(:, ppg_channel));
-                obj.OFs = double(data_hea(ppg_channel).SamplingFrequency);
+                if (ppg_channel == 1) %Every option is identical when there is only one channel (I think). This was the best solution I could come up with
+                    obj.loaded_data = loaded_table;
+                    obj.OFs = double(data_hea(1).SamplingFrequency);
+                else
+                    obj.loaded_data = rot90(loaded_table(:, ppg_channel - 1));
+                    obj.OFs = double(data_hea(ppg_channel - 1).SamplingFrequency);
+                end
 
             case '.mat'
                 loaded_struct = importdata([path file]);
@@ -178,21 +185,6 @@ methods
 
         obj.size_data = size(obj.loaded_data); %read size of loaded data
 
-        % The data may be orientated differently when there is only one entry
-        % (And anyone who organized each entry by column is crazy)
-        %if obj.size_data(1) > obj.size_data(2)
-        %    obj.loaded_data = rot90(obj.loaded_data);
-
-        %    [row_num, tf] = listdlg('PromptString', {'Select the column with PPG data'}, ...
-        %                                'SelectionMode', 'single', 'ListString', string(1:obj.size_data(2)));
-        %    if (tf == false)
-        %        res = false;
-        %        return
-        %    end
-        %    obj.loaded_data = obj.loaded_data(row_num, :);
-        %    obj.size_data = size(obj.loaded_data);
-        %end
-
         obj.num_entries = obj.size_data(1);
 
         if (is_seg)
@@ -201,11 +193,23 @@ methods
             obj.num_seg = 1;
         end
 
-        if (obj.num_seg == 1)
-            obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ceil(obj.size_data(2) * (RFs / OFs))); %Create matrix to store resampled PPG
+        if resample_bool
+            obj.Fs = obj.RFs;
         else
-            obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * RFs) / 1000)); %Create matrix to store resampled PPG
-            %obj.ECG_Filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * RFs) / 1000));
+            obj.Fs = obj.OFs;
+        end
+
+        if resample_bool
+            resample_factor = obj.RFs / obj.OFs;
+        else
+            resample_factor = 1;
+        end
+
+        if (obj.num_seg == 1)
+            obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ceil(obj.size_data(2) * (resample_factor))); %Create matrix to store resampled PPG
+        else
+            obj.PPG_filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * obj.Fs) / 1000)); %Create matrix to store resampled PPG
+            %obj.ECG_Filtered = zeros(obj.size_data(1) * obj.num_seg, ((seg_len * obj.Fs) / 1000));
         end
 
         total_seg = obj.size_data(1) * obj.num_seg;
@@ -218,7 +222,7 @@ methods
         %ecg_filtered = zeros(obj.size_data); %Create matrix to store filtered ECG
         
         
-        obj.PPG_SEG = zeros(obj.size_data(1) * obj.num_seg, ceil((obj.size_data(2) - (obj.size_data(2)/3)) * (RFs / OFs) / obj.num_seg)); %create matrix to store segment
+        obj.PPG_SEG = zeros(obj.size_data(1) * obj.num_seg, ceil((obj.size_data(2) - (obj.size_data(2)/3)) * (resample_factor) / obj.num_seg)); %create matrix to store segment
         obj.APG_SEG = obj.PPG_SEG; %APG database
 
         %Create Filter 
@@ -241,29 +245,24 @@ methods
             m = mean(filtered_data);
             st = std(filtered_data);
             filtered(i, :) = (filtered_data - m)/st; %store filtered data
-
-            %normalizing the data
-            %m = mean(filtered_ecg);
-            %st = std(filtered_ecg);
-            %ecg_filtered(i, :) = (filtered_ecg - m)/st; %store filtered data
         end
 
-        if (RFs ~= OFs)
+        if (obj.resample_bool)
             %resample the data from OFs to RFs
             if (obj.num_seg == 1)
                 for i = 1:obj.size_data(1)
-                    obj.PPG_filtered(i, :) = resample(filtered(i, :), RFs, OFs);
+                    obj.PPG_filtered(i, :) = resample(filtered(i, :), obj.RFs, obj.OFs);
                     obj.entry_and_seg_id(i, :) = [i 1];
                 end
             else    
-                num_per_seg = ceil(seg_len * RFs / 1000); %how many points per segment
+                num_per_seg = ceil(seg_len * obj.Fs / 1000); %how many points per segment
                 for i = 1:obj.size_data(1)
-                    resampled = resample(filtered(i, :), RFs, OFs);
+                    resampled = resample(filtered(i, :), obj.RFs, obj.OFs);
                     for j = 0:obj.num_seg - 1
                         start_seg = 1 + j * (num_per_seg);
                         end_seg = start_seg + num_per_seg - 1;
-                        if (end_seg > ceil(obj.size_data(2) * (RFs / OFs)))
-                            end_seg = ceil(obj.size_data(2) * (RFs / OFs));
+                        if (end_seg > ceil(obj.size_data(2) * (obj.RFs / obj.OFs)))
+                            end_seg = ceil(obj.size_data(2) * (obj.RFs / obj.OFs));
                         end
                         obj.PPG_filtered(1 + ((i - 1) * obj.num_seg) + j, :) = resize(resampled(start_seg:end_seg), num_per_seg);
                         obj.entry_and_seg_id(1 + ((i - 1) * obj.num_seg) + j, :) = [i j + 1];
@@ -275,7 +274,7 @@ methods
                 obj.PPG_filtered = filtered;
                 obj.entry_and_seg_id = [(1:obj.size_data(1))', ones(obj.size_data(1),1)];
             else
-                num_per_seg = ceil((seg_len * OFs) / 1000); %how many points per segment
+                num_per_seg = ceil((seg_len * obj.Fs) / 1000); %how many points per segment
 
                 for i = 1:obj.size_data(1)
                     %divide entry into segments of length num_per_seg
@@ -319,7 +318,7 @@ methods
         res = true;
     end
 
-    function res = LoadDirectory(obj, OFs, RFs, FL, FH, is_seg, seg_len, invert)
+    function res = LoadDirectory(obj, OFs, RFs, resample_bool, FL, FH, is_seg, seg_len, invert)
         %data is loaded from directory
         obj.is_dir = true;
 
@@ -332,6 +331,7 @@ methods
         %set initial parameters for filter
         obj.OFs = OFs;
         obj.RFs = RFs;
+        obj.resample_bool = resample_bool;
         obj.FL = FL;
         obj.FH = FH;
         obj.is_seg = is_seg;
@@ -383,7 +383,7 @@ methods
                 cd(obj.dir_folder);
                 [~, file_name, ~] = fileparts(obj.dir_files(1));
                 data_hea = wfdbdesc(file_name{1});
-                col_arr = {data_hea.Description};
+                col_arr = [{'Choose this if every option in identical'}, {data_hea.Description}];
 
             case '.mat'
                 first_mfile = importdata(strjoin([obj.dir_folder '\' obj.dir_files(1)], ''));
@@ -418,7 +418,11 @@ methods
         obj.SEG_min_max = zeros(obj.size_data(1), 2); %variable to store location of min and max with data id
 
         if (is_seg)
-            num_per_seg = ceil(seg_len * RFs / 1000); %how many points per segment
+            if obj.resample_bool
+                num_per_seg = ceil(seg_len * obj.RFs / 1000); %how many points per segment
+            else
+                num_per_seg = ceil(seg_len * obj.OFs / 1000); %how many points per segment
+            end
             obj.size_data(2) = num_per_seg;
         else
            num_per_seg = 1; %placeholder 
@@ -490,26 +494,20 @@ methods
     end
 
     function [PPG_max_index, PPG_min_index] = FindSegMaxMin(obj)
-
-        %if (if_ecg)
-        %    segment = obj.ECG_Filtered(obj.total_seg_idx ,:);
-        %else
-        %    segment = obj.PPG_filtered(obj.total_seg_idx ,:);
-        %end
         
         segment = obj.PPG_filtered(obj.total_seg_idx ,:);
         %find maxima and minima of current segment
         PPG_max = islocalmax(segment ,"MinProminence",0.5,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/5));
+            "MinSeparation", ceil(obj.Fs/5));
         %tries to find a peak close after minima
-        PPG_min = islocalmin(segment ,"MinProminence",0.5, "ProminenceWindow",[0 ceil(obj.RFs/5)], "FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/5));
+        PPG_min = islocalmin(segment ,"MinProminence",0.5, "ProminenceWindow",[0 ceil(obj.Fs/5)], "FlatSelection","all",...
+            "MinSeparation", ceil(obj.Fs/5));
         %exception if it is the last minima
-        PPG_last_min = islocalmin(flip(segment(end - ceil(obj.RFs/5):end)), "MaxNumExtrema", 1);
+        PPG_last_min = islocalmin(flip(segment(end - ceil(obj.Fs/5):end)), "MaxNumExtrema", 1);
 
         PPG_max_index = find(PPG_max);
         PPG_min_index = find(PPG_min);
-        PPG_last_min_index = find(flip(PPG_last_min)) + (length(segment) - ceil(obj.RFs/5));
+        PPG_last_min_index = find(flip(PPG_last_min)) + (length(segment) - ceil(obj.Fs/5));
 
         if ~isempty(PPG_last_min_index) && ~isempty(PPG_min_index) && PPG_last_min_index(1) ~= PPG_min_index(end)
             PPG_min_index(end + 1) = PPG_last_min_index(1);
@@ -522,7 +520,7 @@ methods
 
         %index_ECG_max = find(ecg_max);
 
-        [cycle_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, obj.RFs, obj.PPG_filtered(obj.total_seg_idx ,:));
+        [cycle_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality, seg_quality] = CalcBestCycle(start_index, end_index, peak_index, obj.Fs, obj.PPG_filtered(obj.total_seg_idx ,:));
 
 
         if isnan(cycle_idx)
@@ -547,10 +545,10 @@ methods
             %calculate u of the next cycle which is needed to calculate extra features
             seg_next_max = obj.PPG_filtered(obj.total_seg_idx, min2:obj.next_peak);
             seg_next_VPG = diff(seg_next_max)*1000;
-            seg_next_VPG = smoothdata(seg_next_VPG, "movmean", ceil(obj.RFs/20)); %data smoothing using 50 ms window at 1000Hz
+            seg_next_VPG = smoothdata(seg_next_VPG, "movmean", ceil(obj.Fs/20)); %data smoothing using 50 ms window at 1000Hz
             
             PPG_vpg_max = islocalmax(seg_next_VPG,"MinProminence",0.2,"FlatSelection","all",...
-                "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",3);
+                "MinSeparation", ceil(obj.Fs/20) ,"MaxNumExtrema",3);
 
             next_u = find(PPG_vpg_max, 1); %index of maxima points
 
@@ -565,7 +563,7 @@ methods
         obj.fiducial.uxvw_index(obj.total_seg_idx, :) = obj.uxvw_time;
         obj.fiducial.abcdef_index(obj.total_seg_idx, :) = obj.abcdef_time;
 
-        feature_struct  = CalcFeatures(obj.OnSpDnDpOff, obj.uxvw, next_u, obj.abcdef, obj.OnSpDnDpOff_time, obj.uxvw_time, obj.abcdef_time, obj.seg, obj.VPG, obj.APG, obj.RFs);
+        feature_struct  = CalcFeatures(obj.OnSpDnDpOff, obj.uxvw, next_u, obj.abcdef, obj.OnSpDnDpOff_time, obj.uxvw_time, obj.abcdef_time, obj.seg, obj.VPG, obj.APG, obj.Fs);
 
         obj.feature.total(obj.total_seg_idx,:) = feature_struct.total;
         obj.feature.fiducial_value(obj.total_seg_idx,:) = feature_struct.fiducial_value;
@@ -592,15 +590,15 @@ methods
         end
 
         %create matrix for segment information
-        if min1 - ceil(obj.RFs/50) < 1
+        if min1 - ceil(obj.Fs/50) < 1
             obj.SEG_min_max(obj.total_seg_idx,1) = 1;
         else
-            obj.SEG_min_max(obj.total_seg_idx,1) = min1 - ceil(obj.RFs/50);
+            obj.SEG_min_max(obj.total_seg_idx,1) = min1 - ceil(obj.Fs/50);
         end
-        if min2 + ceil(obj.RFs/50) > length(obj.PPG_filtered)
+        if min2 + ceil(obj.Fs/50) > length(obj.PPG_filtered)
             obj.SEG_min_max(obj.total_seg_idx,2) = length(obj.PPG_filtered);
         else
-            obj.SEG_min_max(obj.total_seg_idx,2) = min2 + ceil(obj.RFs/50);
+            obj.SEG_min_max(obj.total_seg_idx,2) = min2 + ceil(obj.Fs/50);
         end
 
         %select the segment from the filtered ppg
@@ -613,22 +611,22 @@ methods
         offset = min2 - obj.SEG_min_max(obj.total_seg_idx,1);
 
         obj.VPG = diff(obj.seg)*1000;
-        obj.VPG = smoothdata(obj.VPG, "movmean", ceil(obj.RFs/20)); %data smoothing using 50 ms window at 1000Hz
+        obj.VPG = smoothdata(obj.VPG, "movmean", ceil(obj.Fs/20)); %data smoothing using 50 ms window at 1000Hz
         %plot(obj.VPG);
 
         obj.APG = diff(obj.VPG)*1000;
-        obj.APG = smoothdata(obj.APG, "movmean", ceil(obj.RFs/15)); %data smoothing using 65 ms window at 1000Hz
+        obj.APG = smoothdata(obj.APG, "movmean", ceil(obj.Fs/15)); %data smoothing using 65 ms window at 1000Hz
         %obj.APG = smoothdata(obj.APG, "movmean", 65); %data smoothing using 65 ms window at 1000Hz
         %plot(obj.APG);
 
         obj.JPG = diff(obj.APG)*1000;
-        obj.JPG = smoothdata(obj.JPG,"movmean", ceil(obj.RFs/12)); %data smoothing using 85 ms window at 1000Hz
+        obj.JPG = smoothdata(obj.JPG,"movmean", ceil(obj.Fs/12)); %data smoothing using 85 ms window at 1000Hz
 
         %find maxima and minima of current ppg segment
         PPG_SEG_max = islocalmax(obj.seg,"MinProminence",0.1,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/100) ,"MaxNumExtrema",2);
+            "MinSeparation", ceil(obj.Fs/100) ,"MaxNumExtrema",2);
         PPG_SEG_min = islocalmin(obj.seg,"MinProminence",0.01,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/100) ,"MaxNumExtrema",3);
+            "MinSeparation", ceil(obj.Fs/100) ,"MaxNumExtrema",3);
 
         index_max = find(PPG_SEG_max); %index of maxima points
         value_max = obj.seg(PPG_SEG_max);  %value at maxima point
@@ -638,9 +636,9 @@ methods
         
         %find maxima and minima of current vpg segment
         PPG_vpg_max = islocalmax(obj.VPG,"MinProminence",0.2,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",3);
+            "MinSeparation", ceil(obj.Fs/20) ,"MaxNumExtrema",3);
         PPG_vpg_min = islocalmin(obj.VPG,"MinProminence",0.2,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",2);
+            "MinSeparation", ceil(obj.Fs/20) ,"MaxNumExtrema",2);
 
         index_max_vpg = find(PPG_vpg_max); %index of maxima points
         value_max_vpg = obj.VPG(PPG_vpg_max);  %value at maxima point
@@ -650,9 +648,9 @@ methods
 
         %find maxima and minima of current apg segment
         PPG_apg_max = islocalmax(obj.APG,"MinProminence",1.5,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/100) ,"MaxNumExtrema",5);
+            "MinSeparation", ceil(obj.Fs/100) ,"MaxNumExtrema",5);
         PPG_apg_min = islocalmin(obj.APG,"MinProminence",1.5,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/100) ,"MaxNumExtrema",5);
+            "MinSeparation", ceil(obj.Fs/100) ,"MaxNumExtrema",5);
 
         index_max_apg = find(PPG_apg_max); %index of maxima points
         value_max_apg = obj.APG(PPG_apg_max);  %value at maxima point
@@ -661,7 +659,7 @@ methods
         value_min_apg = obj.APG(PPG_apg_min) ;  %value at maxima point
 
         % new code on 15th MARCH 2023 to check two points close to each other
-        if abs(index_min_apg(1) - index_max_apg(1)) <= ceil(obj.RFs/20)
+        if abs(index_min_apg(1) - index_max_apg(1)) <= ceil(obj.Fs/20)
             disp('The first minimum and maximum are close to each other');
             % Shift the index_min_apg vector by 1
             index_min_apg = index_min_apg(2:end);
@@ -683,21 +681,18 @@ methods
         z_apg = zerocrossing(obj.APG);
 
         max_index_jpg = islocalmax(obj.JPG,"MinProminence",40,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/20) ,"MaxNumExtrema",5);
+            "MinSeparation", ceil(obj.Fs/20) ,"MaxNumExtrema",5);
         min_index_jpg = islocalmin(obj.JPG,"MinProminence",50,"FlatSelection","all",...
-            "MinSeparation",ceil(obj.RFs/20) ,"MaxNumExtrema",5);
+            "MinSeparation",ceil(obj.Fs/20) ,"MaxNumExtrema",5);
 
         index_max_jpg = find(max_index_jpg); %first point of jpg is not detected
         index_min_jpg  = find(min_index_jpg);
         z_jpg = zerocrossing(obj.JPG);
 
         [obj.c_d_pres, c, d, e, f, dn, dp] = APG_c_d_test(obj.APG, obj.APG_maxima, obj.APG_minima, ...
-                                                    obj.JPG, index_max_jpg, index_min_jpg, z_apg, z_jpg, obj.T2_5, obj.RFs);
+                                                    obj.JPG, index_max_jpg, index_min_jpg, z_apg, z_jpg, obj.T2_5, obj.Fs);
 
         seg_size = size(obj.PPG_SEG);
-        %store segments by zero padding remaining values
-        %obj.PPG_SEG(obj.total_seg_idx,:) = [obj.seg zeros(1,(seg_size(2))-length(obj.seg))];
-        %obj.APG_SEG(obj.total_seg_idx,:) = [obj.APG zeros(1,(seg_size(2))-length(obj.APG))];
 
         % nomralize vpg
         m_vpg = mean(obj.VPG);
@@ -752,15 +747,15 @@ methods
         %c and d presence
         obj.c_d_APG(obj.total_seg_idx) = obj.c_d_pres;
 
-        if length(obj.PPG_filtered(obj.total_seg_idx, :)) < min2 + ceil(obj.RFs/2)
+        if length(obj.PPG_filtered(obj.total_seg_idx, :)) < min2 + ceil(obj.Fs/2)
             next_cycle_seg = obj.PPG_filtered(obj.total_seg_idx , min2:end);
         else
-            next_cycle_seg = obj.PPG_filtered(obj.total_seg_idx , min2:(min2 + ceil(obj.RFs/2)));
+            next_cycle_seg = obj.PPG_filtered(obj.total_seg_idx , min2:(min2 + ceil(obj.Fs/2)));
         end
         %find systolic peak of next cycle
         %find maxima and minima of current segment
         next_max = islocalmax(next_cycle_seg ,"MinProminence",0.1,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.RFs/5));
+            "MinSeparation", ceil(obj.Fs/5));
         obj.next_peak = find(next_max, 1) + min2;
         UpdateFeatures(obj);
     end
@@ -885,7 +880,11 @@ methods (Access = private)
                 [~, file_name, ~] = fileparts(obj.dir_files(obj.entry_idx));
                 loaded_table = rdsamp(file_name{1});
 
-                obj.loaded_data = rot90(loaded_table(:, obj.data_col));
+                if obj.data_col == 1
+                    obj.loaded_data = loaded_table;
+                else
+                    obj.loaded_data = rot90(loaded_table(:, obj.data_col));
+                end
 
             case {'.mat'}
                 obj.loaded_data = importdata(filepath);
@@ -921,13 +920,19 @@ methods (Access = private)
             obj.num_seg = 1;
         end
 
+        if obj.resample_bool
+            resample_factor = obj.RFs / obj.OFs;
+        else
+            resample_factor = 1;
+        end
+
         %if this entry is the currently longest entry, risize arrays to fit it
         if (obj.is_seg == false && size_file(2) > obj.size_data(2))
             obj.size_data(2) = size_file(2);
-            obj.PPG_filtered = resize(obj.PPG_filtered, [obj.size_data(1) ceil(obj.size_data(2) * (obj.RFs / obj.OFs))]);
-            obj.PPG_SEG = resize(obj.PPG_SEG, [obj.size_data(1) ceil((obj.size_data(2) - (obj.size_data(2)/3)) * (obj.RFs / obj.OFs))]);
-            obj.APG_SEG = resize(obj.APG_SEG, [obj.size_data(1) ceil((obj.size_data(2) - (obj.size_data(2)/3)) * (obj.RFs / obj.OFs))]);
-        
+            obj.PPG_filtered = resize(obj.PPG_filtered, [obj.size_data(1) ceil(obj.size_data(2) * resample_factor)]);
+            obj.PPG_SEG = resize(obj.PPG_SEG, [obj.size_data(1) ceil((obj.size_data(2) - (obj.size_data(2)/3)) * resample_factor)]);
+            obj.APG_SEG = resize(obj.APG_SEG, [obj.size_data(1) ceil((obj.size_data(2) - (obj.size_data(2)/3)) * resample_factor)]);
+
             %if the assumed total number of segemnts after division is larger than previously assumed, resize array to fit assumtion
         elseif (obj.is_seg == true && obj.total_seg_idx + (obj.num_entries - obj.entry_idx + 1) * obj.num_seg > obj.size_data(1))
             obj.size_data(1) = obj.total_seg_idx + (obj.num_entries - obj.entry_idx + 1) * obj.num_seg;
@@ -996,10 +1001,11 @@ methods (Access = private)
         st = std(filtered_data);
         filtered(obj.entry_idx, :) = (filtered_data - m)/st; %store filtered data
 
-        if (obj.RFs ~= obj.OFs)
+        if (obj.resample_bool)
+            obj.Fs = obj.RFs;
             %resample the data from OFs to RFs   
             if (obj.num_seg == 1) 
-                obj.PPG_filtered(obj.entry_idx, :) = resize(resample(filtered(obj.entry_idx, :), obj.RFs, obj.OFs), obj.size_data(2));
+                obj.PPG_filtered(obj.entry_idx, :) = resize(resample(filtered(obj.entry_idx, :), obj.RFs, obj.OFs), obj.size_data(2) * resample_factor);
             else
                 resampled = resample(filtered(obj.entry_idx, :), obj.RFs, obj.OFs);
                 %divide entry into segments of length obj.size_data(2)
@@ -1014,6 +1020,7 @@ methods (Access = private)
                 end
             end
         else
+            obj.Fs = obj.OFs;
             if (obj.num_seg == 1)
                 %obj.PPG_filtered = filtered;
                 obj.PPG_filtered(obj.entry_idx, :) = resize(filtered(obj.entry_idx, :), obj.size_data(2));
@@ -1043,7 +1050,7 @@ methods (Access = private)
         % Set start, end and peak index arrays to zero of size index_PPG_min
         [start_index, end_index, peak_index] = deal(zeros(size(index_PPG_min)));
 
-        threshold = 40 * obj.RFs/100;
+        threshold = 40 * obj.Fs/100;
 
         cycle_index = 0;
 
