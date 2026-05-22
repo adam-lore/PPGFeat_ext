@@ -75,11 +75,11 @@ function [index, corr_quality, skew_quality, seg_corr_quality, seg_skew_quality,
         mean_cycle = mean(centered_cycles);
     end
 
-    %corr_w = 2/3;
-    %skew_w = 1/3;
+    %corr_w = 0.8;
+    %skew_w = 0.2;
 
-    corr_w = 0.8;
-    skew_w = 0.2;
+    corr_w = 0.65301;
+    skew_w = -0.14687;
     
     for i = 1 + start_buffer:num_cycle - end_buffer
         

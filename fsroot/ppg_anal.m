@@ -493,30 +493,8 @@ methods
         end
     end
 
-    function [PPG_max_index, PPG_min_index] = FindSegMaxMin(obj)
-        
-        segment = obj.PPG_filtered(obj.total_seg_idx ,:);
-        %find maxima and minima of current segment
-        PPG_max = islocalmax(segment ,"MinProminence",0.5,"FlatSelection","all",...
-            "MinSeparation", ceil(obj.Fs/5));
-        %tries to find a peak close after minima
-        PPG_min = islocalmin(segment ,"MinProminence",0.5, "ProminenceWindow",[0 ceil(obj.Fs/5)], "FlatSelection","all",...
-            "MinSeparation", ceil(obj.Fs/5));
-        %exception if it is the last minima
-        PPG_last_min = islocalmin(flip(segment(end - ceil(obj.Fs/5):end)), "MaxNumExtrema", 1);
-
-        PPG_max_index = find(PPG_max);
-        PPG_min_index = find(PPG_min);
-        PPG_last_min_index = find(flip(PPG_last_min)) + (length(segment) - ceil(obj.Fs/5));
-
-        if ~isempty(PPG_last_min_index) && ~isempty(PPG_min_index) && PPG_last_min_index(1) ~= PPG_min_index(end)
-            PPG_min_index(end + 1) = PPG_last_min_index(1);
-        end
-    end
-
     function [start_idx, end_idx, corr_qulity, skew_quality, seg_corr_quality, seg_skew_quality, quality, seg_quality] = FindBestCycle(obj)
-        [start_index, end_index, peak_index] = obj.FindCycles();
-        %[ecg_max, ecg_min] = obj.FindSegMaxMin();
+        [start_index, end_index, peak_index] = FindCycles(obj.total_seg_idx, obj.PPG_filtered, obj.Fs);
 
         %index_ECG_max = find(ecg_max);
 
@@ -1042,53 +1020,6 @@ methods (Access = private)
         B = 1:1:obj.size_data(1);
         B = B';
         obj.Ssqi = [A B];
-    end
-
-    function [start_index, end_index, peak_index] = FindCycles(obj)
-        [index_PPG_max, index_PPG_min] = FindSegMaxMin(obj);
-
-        % Set start, end and peak index arrays to zero of size index_PPG_min
-        [start_index, end_index, peak_index] = deal(zeros(size(index_PPG_min)));
-
-        threshold = 40 * obj.Fs/100;
-
-        cycle_index = 0;
-
-        % Find two minima that are sufficiently far apart and has a peak in between
-        % Loop over all minima indices
-        for i = 1:length(index_PPG_min)-1
-            
-            % Check if the next minimum index is greater than the current one by
-            % the threshold value
-            if index_PPG_min(i+1) > index_PPG_min(i) + threshold
-                % If yes, check if there is any maximum index between the two minima
-                maxima_between_minima = index_PPG_max(index_PPG_max > index_PPG_min(i) & index_PPG_max < index_PPG_min(i+1));
-                next_peak = index_PPG_max(find(index_PPG_max > index_PPG_min(i+1), 1));
-                if ~isempty(maxima_between_minima) & ~isempty(next_peak)
-                    cycle_index = cycle_index + 1;
-
-                    start_index(cycle_index) = index_PPG_min(i);
-                    end_index(cycle_index) = index_PPG_min(i+1);
-
-                    peak_index(cycle_index) = maxima_between_minima(1);
-                    peak_value = obj.PPG_filtered(maxima_between_minima(1));
-
-                    % Find the highest peak in the cycle
-                    if length(maxima_between_minima) > 1
-                        for j = 2:length(maxima_between_minima)
-                            if obj.PPG_filtered(maxima_between_minima(j)) > peak_value
-                                peak_index(cycle_index) = maxima_between_minima(j);
-                                peak_value = obj.PPG_filtered(maxima_between_minima(j));
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        start_index = resize(start_index, cycle_index);
-        end_index = resize(end_index, cycle_index); 
-        peak_index = resize(peak_index, cycle_index);
     end
 end
 
