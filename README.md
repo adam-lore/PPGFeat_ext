@@ -21,6 +21,8 @@ The app takes raw unfiltered PPG data and tries the find the best cycle in each 
 
 [Video of PPGFeat - Extended in use](https://www.youtube.com/watch?v=HmEc5A7E4Vw)
 
+Testfile.m also contains some examples of how to use some of the functions without interacting with the MATLAB app.
+
 ## Dependencies
 MATLAB toolboxes:
 - Signal Processing Toolbox
