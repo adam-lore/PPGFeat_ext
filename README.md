@@ -19,6 +19,8 @@ The app takes raw unfiltered PPG data and tries the find the best cycle in each 
 4. Pressing the Plot button will cause the toolbox to calculate all the fiducial points and the features for the current cycle. The values can be manually updated by pressing the Update button which will save the fiducial values from the edit fields and recalculate the features.
 5. The entries can either be processed one by one using the Next button or the toolbox can process every entry automatically using the Process every entry button.
 
+[Video of PPGFeat - Extended in use](https://www.youtube.com/watch?v=HmEc5A7E4Vw)
+
 ## Dependencies
 MATLAB toolboxes:
 - Signal Processing Toolbox
