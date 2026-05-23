@@ -71,6 +71,7 @@ methods
     function obj = ppg_anal()
         %add function folder to path
         addpath(fullfile(fileparts(which("ppg_anal")), 'functions'));
+        addpath(fullfile(fileparts(which("ppg_anal")), 'functions/Natural-Order Filename Sort'));
     end
 
     function res = LoadPPG(obj, OFs, RFs, resample_bool, FL, FH, is_seg, seg_len, invert)
